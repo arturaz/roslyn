@@ -822,35 +822,47 @@ namespace Microsoft.CodeAnalysis
         private static void RunCompilationExtensions(
             ref Compilation compilation, DiagnosticBag diagnosticBag
         ) {
-            var currentDirectory = Directory.GetCurrentDirectory();
-            var assemblyPaths = Directory.GetFiles(currentDirectory).Where(path => {
-                var filename = Path.GetFileName(path);
-                return filename.StartsWith("CompilationExtension") && filename.EndsWith(".dll");
-            });
+            var currentProcessPath = Process.GetCurrentProcess().MainModule?.FileName;
+            if (string.IsNullOrEmpty(currentProcessPath)) {
+                diagnosticBag.Add(ceiErr("CEI100", "Can't determine path to current process!"));
+                return;
+            }
+            var currentDirectory = Path.GetDirectoryName(currentProcessPath);
+            var ceiType = typeof(IProcessCompilation);
+            const string PATTERN = "CompilationExtension*.dll";
+            diagnosticBag.Add(ceiInfo(
+                "CEI102", 
+                $"Looking for '{PATTERN}' in '{currentDirectory}' that has classes with parameterless constructor " +
+                $"implementing '{ceiType.FullName}'."
+            ));
+            var ceiAssemblyPath = Path.GetFullPath(ceiType.Assembly.Location);
+            var assemblyPaths = 
+                Directory.GetFiles(currentDirectory, PATTERN)
+                .Where(path => Path.GetFullPath(path) != ceiAssemblyPath);
             foreach (var assemblyPath in assemblyPaths) {
+                diagnosticBag.Add(ceiInfo("CEI103", $"Found DLL: {assemblyPath}"));
                 try {
                     var assembly = Assembly.LoadFile(assemblyPath);
-                    RunCompilationExtensions(assembly, ref compilation, diagnosticBag);
+                    RunCompilationExtensions(assembly, ref compilation, diagnosticBag, ceiType);
                 }
                 catch (Exception e) {
-                    ceiErr("CEI000", $"Error while loading assembly at {assemblyPath}: {e}");
+                    diagnosticBag.Add(ceiErr("CEI101", $"Error while loading assembly at {assemblyPath}: {e}"));
                 }
             }
         }
 
         static void RunCompilationExtensions(
-            Assembly assembly, ref Compilation compilation, DiagnosticBag diagnosticBag
+            Assembly assembly, ref Compilation compilation, DiagnosticBag diagnosticBag, Type ceiType
         ) {
             try {
-                var type = typeof(IProcessCompilation);
                 var hooks =
                     assembly.DefinedTypes
-                        .Where(t => t.ImplementedInterfaces.Contains(type))
+                        .Where(t => t.ImplementedInterfaces.Contains(ceiType))
                         .ToArray();
                 foreach (var hook in hooks) {
                     var instance = Activator.CreateInstance(hook);
                     if (instance == null) {
-                        addErr(ceiErr("CEI001", $"Can't create hook {hook.FullName} with parametreless constructor"));
+                        addErr(ceiErr("CEI001", $"Can't create hook {hook.FullName} with parameterless constructor"));
                     }
                     else if (instance is IProcessCompilation processCompilation) {
                         var objCompilation = (object) compilation;
@@ -892,14 +904,17 @@ namespace Microsoft.CodeAnalysis
                 addErr(ceiErr("CEI005", $"Exception processing {assembly}: {e}"));
             }
 
-            void addErr(Diagnostic diagnostic) {
-                diagnosticBag.Add(diagnostic);
-            }
+            void addErr(Diagnostic diagnostic) => diagnosticBag.Add(diagnostic);
         } 
             
         static Diagnostic ceiErr(string code, string msg, Location location = null) =>
             Diagnostic.Create(new DiagnosticDescriptor(
                 code, "Error", msg, "CompilationExtensionInterfaces", DiagnosticSeverity.Error, true
+            ), location);
+        
+        static Diagnostic ceiInfo(string code, string msg, Location location = null) =>
+            Diagnostic.Create(new DiagnosticDescriptor(
+                code, "Info", msg, "CompilationExtensionInterfaces", DiagnosticSeverity.Info, true
             ), location);
 
         private static CompilerAnalyzerConfigOptionsProvider CreateAnalyzerConfigOptionsProvider(

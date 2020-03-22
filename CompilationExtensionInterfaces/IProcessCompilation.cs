@@ -2,6 +2,9 @@
 
 namespace CompilationExtensionInterfaces
 {
+    /// <summary>
+    /// Implement this and put the resulting dll in the compiler directory to hook into the compilation process.
+    /// </summary>
     public interface IProcessCompilation
     {
         /// <summary>
