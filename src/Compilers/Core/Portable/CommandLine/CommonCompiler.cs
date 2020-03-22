@@ -13,6 +13,7 @@ using System.Reflection;
 using System.Security.Cryptography;
 using System.Text;
 using System.Threading;
+using CompilationExtensionInterfaces;
 using Microsoft.CodeAnalysis.Collections;
 using Microsoft.CodeAnalysis.Diagnostics;
 using Microsoft.CodeAnalysis.PooledObjects;
@@ -768,8 +769,10 @@ namespace Microsoft.CodeAnalysis
                 return Failed;
             }
 
+            RunCompilationExtensions(ref compilation, diagnostics);
+            if (ReportDiagnostics(diagnostics, consoleOutput, errorLogger)) return Failed;
+            
             var additionalTexts = ImmutableArray<AdditionalText>.CastUp(additionalTextFiles);
-
             CompileAndEmit(
                 touchedFilesLogger,
                 ref compilation,
@@ -815,6 +818,89 @@ namespace Microsoft.CodeAnalysis
 
             return exitCode;
         }
+
+        private static void RunCompilationExtensions(
+            ref Compilation compilation, DiagnosticBag diagnosticBag
+        ) {
+            var currentDirectory = Directory.GetCurrentDirectory();
+            var assemblyPaths = Directory.GetFiles(currentDirectory).Where(path => {
+                var filename = Path.GetFileName(path);
+                return filename.StartsWith("CompilationExtension") && filename.EndsWith(".dll");
+            });
+            foreach (var assemblyPath in assemblyPaths) {
+                try {
+                    var assembly = Assembly.LoadFile(assemblyPath);
+                    RunCompilationExtensions(assembly, ref compilation, diagnosticBag);
+                }
+                catch (Exception e) {
+                    ceiErr("CEI000", $"Error while loading assembly at {assemblyPath}: {e}");
+                }
+            }
+        }
+
+        static void RunCompilationExtensions(
+            Assembly assembly, ref Compilation compilation, DiagnosticBag diagnosticBag
+        ) {
+            try {
+                var type = typeof(IProcessCompilation);
+                var hooks =
+                    assembly.DefinedTypes
+                        .Where(t => t.ImplementedInterfaces.Contains(type))
+                        .ToArray();
+                foreach (var hook in hooks) {
+                    var instance = Activator.CreateInstance(hook);
+                    if (instance == null) {
+                        addErr(ceiErr("CEI001", $"Can't create hook {hook.FullName} with parametreless constructor"));
+                    }
+                    else if (instance is IProcessCompilation processCompilation) {
+                        var objCompilation = (object) compilation;
+                        var untypedDiagnostics = processCompilation.process(ref objCompilation);
+                        if (objCompilation is Compilation newCompilation) {
+                            compilation = newCompilation;
+                            var idx = 0;
+                            foreach (var untypedDiagnostic in untypedDiagnostics) {
+                                if (untypedDiagnostic is Diagnostic diagnostic) {
+                                    addErr(diagnostic);
+                                }
+                                else {
+                                    addErr(ceiErr(
+                                        "CEI004",
+                                        $"Hook {hook.FullName} returned not Diagnostic at index {idx} " +
+                                        $"but {untypedDiagnostic.GetType().FullName}"
+                                    ));
+                                }
+
+                                idx++;
+                            }
+                        }
+                        else {
+                            addErr(ceiErr(
+                                "CEI003",
+                                $"Hook {hook.FullName} returned not Compilation but {objCompilation.GetType().FullName}"
+                            ));
+                        }
+                    }
+                    else {
+                        addErr(ceiErr(
+                            "CEI004",
+                            $"Hook {hook.FullName} returned not IProcessCompilation but {instance.GetType().FullName}"
+                        ));
+                    }
+                }
+            }
+            catch (Exception e) {
+                addErr(ceiErr("CEI005", $"Exception processing {assembly}: {e}"));
+            }
+
+            void addErr(Diagnostic diagnostic) {
+                diagnosticBag.Add(diagnostic);
+            }
+        } 
+            
+        static Diagnostic ceiErr(string code, string msg, Location location = null) =>
+            Diagnostic.Create(new DiagnosticDescriptor(
+                code, "Error", msg, "CompilationExtensionInterfaces", DiagnosticSeverity.Error, true
+            ), location);
 
         private static CompilerAnalyzerConfigOptionsProvider CreateAnalyzerConfigOptionsProvider(
             IEnumerable<SyntaxTree> syntaxTrees,
