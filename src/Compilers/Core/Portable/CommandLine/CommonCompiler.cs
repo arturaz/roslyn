@@ -822,12 +822,7 @@ namespace Microsoft.CodeAnalysis
         private static void RunCompilationExtensions(
             ref Compilation compilation, DiagnosticBag diagnosticBag
         ) {
-            var currentProcessPath = Process.GetCurrentProcess().MainModule?.FileName;
-            if (string.IsNullOrEmpty(currentProcessPath)) {
-                diagnosticBag.Add(ceiErr("CEI100", "Can't determine path to current process!"));
-                return;
-            }
-            var currentDirectory = Path.GetDirectoryName(currentProcessPath);
+            var currentDirectory = Path.GetDirectoryName(typeof(CommonCompiler).Assembly.Location);
             var ceiType = typeof(IProcessCompilation);
             const string PATTERN = "CompilationExtension*.dll";
             diagnosticBag.Add(ceiInfo(
