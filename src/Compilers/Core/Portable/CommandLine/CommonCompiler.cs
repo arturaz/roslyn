@@ -771,7 +771,7 @@ namespace Microsoft.CodeAnalysis
 
             RunCompilationExtensions(ref compilation, diagnostics);
             if (ReportDiagnostics(diagnostics, consoleOutput, errorLogger)) return Failed;
-            
+
             var additionalTexts = ImmutableArray<AdditionalText>.CastUp(additionalTextFiles);
             CompileAndEmit(
                 touchedFilesLogger,
@@ -837,7 +837,8 @@ namespace Microsoft.CodeAnalysis
             foreach (var assemblyPath in assemblyPaths) {
                 diagnosticBag.Add(ceiInfo("CEI103", $"Found DLL: {assemblyPath}"));
                 try {
-                    var assembly = Assembly.LoadFile(assemblyPath);
+                    // Assembly.LoadFile does not load dependencies in dotnet
+                    var assembly = Assembly.LoadFrom(assemblyPath);
                     RunCompilationExtensions(assembly, ref compilation, diagnosticBag, ceiType);
                 }
                 catch (Exception e) {
