@@ -769,7 +769,7 @@ namespace Microsoft.CodeAnalysis
                 return Failed;
             }
 
-            RunCompilationExtensions(ref compilation, diagnostics);
+            RunCompilationExtensions(ref compilation, diagnostics, Arguments.BaseDirectory ?? "");
             if (ReportDiagnostics(diagnostics, consoleOutput, errorLogger)) return Failed;
 
             var additionalTexts = ImmutableArray<AdditionalText>.CastUp(additionalTextFiles);
@@ -820,7 +820,7 @@ namespace Microsoft.CodeAnalysis
         }
 
         private static void RunCompilationExtensions(
-            ref Compilation compilation, DiagnosticBag diagnosticBag
+            ref Compilation compilation, DiagnosticBag diagnosticBag, string baseDirectory
         ) {
             var currentDirectory = Path.GetDirectoryName(typeof(CommonCompiler).Assembly.Location);
             var ceiType = typeof(IProcessCompilation);
@@ -839,7 +839,7 @@ namespace Microsoft.CodeAnalysis
                 try {
                     // Assembly.LoadFile does not load dependencies in dotnet
                     var assembly = Assembly.LoadFrom(assemblyPath);
-                    RunCompilationExtensions(assembly, ref compilation, diagnosticBag, ceiType);
+                    RunCompilationExtensions(assembly, ref compilation, diagnosticBag, ceiType, baseDirectory);
                 }
                 catch (Exception e) {
                     diagnosticBag.Add(ceiErr("CEI101", $"Error while loading assembly at {assemblyPath}: {e}"));
@@ -848,7 +848,8 @@ namespace Microsoft.CodeAnalysis
         }
 
         static void RunCompilationExtensions(
-            Assembly assembly, ref Compilation compilation, DiagnosticBag diagnosticBag, Type ceiType
+            Assembly assembly, ref Compilation compilation, DiagnosticBag diagnosticBag, Type ceiType,
+            string baseDirectory
         ) {
             try {
                 var hooks =
@@ -861,8 +862,8 @@ namespace Microsoft.CodeAnalysis
                         addErr(ceiErr("CEI001", $"Can't create hook {hook.FullName} with parameterless constructor"));
                     }
                     else if (instance is IProcessCompilation processCompilation) {
-                        var objCompilation = (object) compilation;
-                        var untypedDiagnostics = processCompilation.process(ref objCompilation);
+                        var objCompilation = (object)compilation;
+                        var untypedDiagnostics = processCompilation.process(ref objCompilation, baseDirectory);
                         if (objCompilation is Compilation newCompilation) {
                             compilation = newCompilation;
                             var idx = 0;
