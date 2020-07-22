@@ -822,7 +822,7 @@ namespace Microsoft.CodeAnalysis
         private static void RunCompilationExtensions(
             ref Compilation compilation, DiagnosticBag diagnosticBag, string baseDirectory
         ) {
-            var currentDirectory = Path.GetDirectoryName(typeof(CommonCompiler).Assembly.Location);
+            var currentDirectory = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
             var ceiType = typeof(IProcessCompilation);
             const string PATTERN = "CompilationExtension*.dll";
             diagnosticBag.Add(ceiInfo(
