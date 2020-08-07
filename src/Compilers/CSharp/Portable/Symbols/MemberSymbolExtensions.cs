@@ -102,6 +102,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
                 case SymbolKind.Property:
                     return ((PropertySymbol)member).ParameterCount;
                 case SymbolKind.Event:
+                case SymbolKind.Field:
                     return 0;
                 default:
                     throw ExceptionUtilities.UnexpectedValue(member.Kind);
@@ -221,6 +222,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
                 case SymbolKind.NamedType:
                 case SymbolKind.PointerType:
                 case SymbolKind.TypeParameter:
+                case SymbolKind.FunctionPointerType:
                     return ((TypeSymbol)m).CustomModifierCount();
                 case SymbolKind.Event:
                     return ((EventSymbol)m).CustomModifierCount();
@@ -384,6 +386,31 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
         }
 
         /// <summary>
+        /// Indicates whether the method should be emitted.
+        /// </summary>
+        internal static bool ShouldEmit(this MethodSymbol method)
+        {
+            // Don't emit the default value type constructor - the runtime handles that
+            if (method.IsDefaultValueTypeConstructor())
+            {
+                return false;
+            }
+
+            if (method is SynthesizedStaticConstructor cctor && !cctor.ShouldEmit())
+            {
+                return false;
+            }
+
+            // Don't emit partial methods without an implementation part.
+            if (method.IsPartialMethod() && method.PartialImplementationPart is null)
+            {
+                return false;
+            }
+
+            return true;
+        }
+
+        /// <summary>
         /// If the event has a AddMethod, return that.  Otherwise check the overridden
         /// event, if any.  Repeat for each overridden event.
         /// </summary>
@@ -517,7 +544,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
             {
                 case SymbolKind.Method:
                     var method = (MethodSymbol)member;
-                    return method.GetConstructedLeastOverriddenMethod(accessingTypeOpt);
+                    return method.GetConstructedLeastOverriddenMethod(accessingTypeOpt, requireSameReturnType: false);
 
                 case SymbolKind.Property:
                     var property = (PropertySymbol)member;

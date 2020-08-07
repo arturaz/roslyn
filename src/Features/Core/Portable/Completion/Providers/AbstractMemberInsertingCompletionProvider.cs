@@ -120,7 +120,9 @@ namespace Microsoft.CodeAnalysis.Completion.Providers
             }
 
             // CodeGenerationOptions containing before and after
-            var options = new CodeGenerationOptions(contextLocation: semanticModel.SyntaxTree.GetLocation(TextSpan.FromBounds(line.Start, line.Start)));
+            var options = new CodeGenerationOptions(
+                contextLocation: semanticModel.SyntaxTree.GetLocation(TextSpan.FromBounds(line.Start, line.Start)),
+                options: await document.GetOptionsAsync(cancellationToken).ConfigureAwait(false));
 
             var generatedMember = await GenerateMemberAsync(overriddenMember, containingType, document, completionItem, cancellationToken).ConfigureAwait(false);
             generatedMember = _annotation.AddAnnotationToSymbol(generatedMember);
@@ -168,7 +170,7 @@ namespace Microsoft.CodeAnalysis.Completion.Providers
         private async Task<string> GenerateInsertionTextAsync(
             Document memberContainingDocument, CancellationToken cancellationToken)
         {
-            memberContainingDocument = await Simplifier.ReduceAsync(memberContainingDocument, Simplifier.Annotation, null, cancellationToken).ConfigureAwait(false);
+            memberContainingDocument = await Simplifier.ReduceAsync(memberContainingDocument, Simplifier.Annotation, optionSet: null, cancellationToken).ConfigureAwait(false);
             memberContainingDocument = await Formatter.FormatAsync(memberContainingDocument, Formatter.Annotation, cancellationToken: cancellationToken).ConfigureAwait(false);
 
             var root = await memberContainingDocument.GetSyntaxRootAsync(cancellationToken).ConfigureAwait(false);
@@ -178,8 +180,11 @@ namespace Microsoft.CodeAnalysis.Completion.Providers
         private async Task<SyntaxNode> GetTreeWithAddedSyntaxNodeRemovedAsync(
             Document document, CancellationToken cancellationToken)
         {
-            var root = await document.GetSyntaxRootAsync(cancellationToken).ConfigureAwait(false);
+            // Added imports are annotated for simplification too. Therefore, we simplify the document
+            // before removing added member node to preserve those imports in the document.
+            document = await Simplifier.ReduceAsync(document, Simplifier.Annotation, optionSet: null, cancellationToken).ConfigureAwait(false);
 
+            var root = await document.GetSyntaxRootAsync(cancellationToken).ConfigureAwait(false);
             var members = root.GetAnnotatedNodesAndTokens(_annotation)
                               .AsImmutable()
                               .Select(m => m.AsNode());
@@ -188,7 +193,6 @@ namespace Microsoft.CodeAnalysis.Completion.Providers
 
             var dismemberedDocument = document.WithSyntaxRoot(root);
 
-            dismemberedDocument = await Simplifier.ReduceAsync(dismemberedDocument, Simplifier.Annotation, null, cancellationToken).ConfigureAwait(false);
             dismemberedDocument = await Formatter.FormatAsync(dismemberedDocument, Formatter.Annotation, cancellationToken: cancellationToken).ConfigureAwait(false);
             return await dismemberedDocument.GetSyntaxRootAsync(cancellationToken).ConfigureAwait(false);
         }
@@ -206,9 +210,7 @@ namespace Microsoft.CodeAnalysis.Completion.Providers
                 enterKeyRule: EnterKeyRule.Never);
 
         internal virtual CompletionItemRules GetRules()
-        {
-            return s_defaultRules;
-        }
+            => s_defaultRules;
 
         protected override Task<CompletionDescription> GetDescriptionWorkerAsync(Document document, CompletionItem item, CancellationToken cancellationToken)
             => MemberInsertionCompletionItem.GetDescriptionAsync(item, document, cancellationToken);

@@ -158,6 +158,7 @@
   </data>
   <data name="Generate_XML_documentation_comments_for" xml:space="preserve">
     <value>_Generate XML documentation comments for '''</value>
+    <comment>{Locked="'''"} "'''" is a VB keyword and should not be localized.</comment>
   </data>
   <data name="Highlighting" xml:space="preserve">
     <value>Highlighting</value>
@@ -296,5 +297,8 @@
   </data>
   <data name="Show_items_from_unimported_namespaces" xml:space="preserve">
     <value>Show items from unimported namespaces (experimental)</value>
+  </data>
+  <data name="Show_remarks_in_Quick_Info" xml:space="preserve">
+    <value>Show remarks in Quick Info</value>
   </data>
 </root>

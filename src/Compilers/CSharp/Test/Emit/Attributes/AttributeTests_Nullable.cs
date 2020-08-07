@@ -460,6 +460,57 @@ class C
         }
 
         [Fact]
+        public void ExplicitAttribute_ReferencedInSource()
+        {
+            var sourceAttribute =
+@"namespace System.Runtime.CompilerServices
+{
+    internal class NullableAttribute : System.Attribute
+    {
+        internal NullableAttribute(byte b) { }
+    }
+}";
+            var source =
+@"#pragma warning disable 169
+using System.Runtime.CompilerServices;
+[assembly: Nullable(0)]
+[module: Nullable(0)]
+[Nullable(0)]
+class Program
+{
+    [Nullable(0)]object F;
+    [Nullable(0)]static object M1() => throw null;
+    [return: Nullable(0)]static object M2() => throw null;
+    static void M3([Nullable(0)]object arg) { }
+}";
+
+            // C#7
+            var comp = CreateCompilation(new[] { sourceAttribute, source }, parseOptions: TestOptions.Regular7);
+            verifyDiagnostics(comp);
+
+            // C#8
+            comp = CreateCompilation(new[] { sourceAttribute, source });
+            verifyDiagnostics(comp);
+
+            static void verifyDiagnostics(CSharpCompilation comp)
+            {
+                comp.VerifyDiagnostics(
+                    // (5,2): error CS8623: Explicit application of 'System.Runtime.CompilerServices.NullableAttribute' is not allowed.
+                    // [Nullable(0)]
+                    Diagnostic(ErrorCode.ERR_ExplicitNullableAttribute, "Nullable(0)").WithLocation(5, 2),
+                    // (8,6): error CS8623: Explicit application of 'System.Runtime.CompilerServices.NullableAttribute' is not allowed.
+                    //     [Nullable(0)]object F;
+                    Diagnostic(ErrorCode.ERR_ExplicitNullableAttribute, "Nullable(0)").WithLocation(8, 6),
+                    // (10,14): error CS8623: Explicit application of 'System.Runtime.CompilerServices.NullableAttribute' is not allowed.
+                    //     [return: Nullable(0)]static object M2() => throw null;
+                    Diagnostic(ErrorCode.ERR_ExplicitNullableAttribute, "Nullable(0)").WithLocation(10, 14),
+                    // (11,21): error CS8623: Explicit application of 'System.Runtime.CompilerServices.NullableAttribute' is not allowed.
+                    //     static void M3([Nullable(0)]object arg) { }
+                    Diagnostic(ErrorCode.ERR_ExplicitNullableAttribute, "Nullable(0)").WithLocation(11, 21));
+            }
+        }
+
+        [Fact]
         public void AttributeFromInternalsVisibleTo_01()
         {
             var sourceA =
@@ -2269,6 +2320,49 @@ class C
                     AssertNullableAttribute(method.GetReturnTypeAttributes());
                     AssertAttributes(method.GetAttributes(), "System.Diagnostics.DebuggerHiddenAttribute");
                 });
+        }
+
+        [Fact]
+        public void EmitAttribute_UnconstrainedTypeParameter()
+        {
+            var source =
+@"#nullable enable
+public class Program
+{
+    public T F1<T>() => default!;
+    public T? F2<T>() => default;
+    public T F3<T>() where T : class => default!;
+    public T? F4<T>() where T : class => default;
+    public T F5<T>() where T : class? => default!;
+    public T F6<T>() where T : struct => default;
+    public T? F7<T>() where T : struct => default;
+    public T F8<T>() where T : notnull => default;
+    public T? F9<T>() where T : notnull => default!;
+}";
+            var comp = CreateCompilation(source, parseOptions: TestOptions.RegularPreview);
+            var expected =
+@"[NullableContext(1)] [Nullable(0)] Program
+    T F1<T>()
+        [Nullable(2)] T
+    [NullableContext(2)] T? F2<T>()
+        T
+    T! F3<T>() where T : class!
+        T
+    [Nullable(2)] T? F4<T>() where T : class!
+        T
+    T F5<T>() where T : class?
+        [Nullable(2)] T
+    [NullableContext(0)] T F6<T>() where T : struct
+        T
+    [NullableContext(0)] T? F7<T>() where T : struct
+        T
+    T F8<T>() where T : notnull
+        T
+    [Nullable(2)] T? F9<T>() where T : notnull
+        T
+    Program()
+";
+            AssertNullableAttributes(comp, expected);
         }
 
         [Fact]

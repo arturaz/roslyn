@@ -8,6 +8,7 @@ using System.Collections.Immutable;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.CodeAnalysis.PooledObjects;
 using Microsoft.CodeAnalysis.Shared.Extensions;
 using Microsoft.CodeAnalysis.Shared.Utilities;
 
@@ -15,6 +16,9 @@ namespace Microsoft.CodeAnalysis.Completion.Providers
 {
     internal static partial class SymbolCompletionItem
     {
+        private static readonly Func<IReadOnlyList<ISymbol>, CompletionItem, CompletionItem> s_addSymbolEncoding = AddSymbolEncoding;
+        private static readonly Func<IReadOnlyList<ISymbol>, CompletionItem, CompletionItem> s_addSymbolInfo = AddSymbolInfo;
+
         private static CompletionItem CreateWorker(
             string displayText,
             string displayTextSuffix,
@@ -55,9 +59,7 @@ namespace Microsoft.CodeAnalysis.Completion.Providers
         }
 
         public static CompletionItem AddSymbolEncoding(IReadOnlyList<ISymbol> symbols, CompletionItem item)
-        {
-            return item.AddProperty("Symbols", EncodeSymbols(symbols));
-        }
+            => item.AddProperty("Symbols", EncodeSymbols(symbols));
 
         public static CompletionItem AddSymbolInfo(IReadOnlyList<ISymbol> symbols, CompletionItem item)
         {
@@ -88,14 +90,10 @@ namespace Microsoft.CodeAnalysis.Completion.Providers
         }
 
         public static string EncodeSymbol(ISymbol symbol)
-        {
-            return SymbolKey.CreateString(symbol);
-        }
+            => SymbolKey.CreateString(symbol);
 
         public static bool HasSymbols(CompletionItem item)
-        {
-            return item.Properties.ContainsKey("Symbols");
-        }
+            => item.Properties.ContainsKey("Symbols");
 
         private static readonly char[] s_symbolSplitters = new[] { '|' };
 
@@ -104,7 +102,7 @@ namespace Microsoft.CodeAnalysis.Completion.Providers
             if (item.Properties.TryGetValue("Symbols", out var symbolIds))
             {
                 var idList = symbolIds.Split(s_symbolSplitters, StringSplitOptions.RemoveEmptyEntries).ToList();
-                var symbols = new List<ISymbol>();
+                using var _ = ArrayBuilder<ISymbol>.GetInstance(out var symbols);
 
                 var compilation = await document.Project.GetCompilationAsync(cancellationToken).ConfigureAwait(false);
                 DecodeSymbols(idList, compilation, symbols);
@@ -124,13 +122,13 @@ namespace Microsoft.CodeAnalysis.Completion.Providers
                     }
                 }
 
-                return symbols.ToImmutableArray();
+                return symbols.ToImmutable();
             }
 
             return ImmutableArray<ISymbol>.Empty;
         }
 
-        private static void DecodeSymbols(List<string> ids, Compilation compilation, List<ISymbol> symbols)
+        private static void DecodeSymbols(List<string> ids, Compilation compilation, ArrayBuilder<ISymbol> symbols)
         {
             for (var i = 0; i < ids.Count;)
             {
@@ -149,9 +147,7 @@ namespace Microsoft.CodeAnalysis.Completion.Providers
         }
 
         private static ISymbol DecodeSymbol(string id, Compilation compilation)
-        {
-            return SymbolKey.ResolveString(id, compilation).GetAnySymbol();
-        }
+            => SymbolKey.ResolveString(id, compilation).GetAnySymbol();
 
         public static async Task<CompletionDescription> GetDescriptionAsync(
             CompletionItem item, Document document, CancellationToken cancellationToken)
@@ -288,7 +284,7 @@ namespace Microsoft.CodeAnalysis.Completion.Providers
         {
             return CreateWorker(
                 displayText, displayTextSuffix, symbols, rules, contextPosition,
-                AddSymbolEncoding, sortText, insertionText,
+                s_addSymbolEncoding, sortText, insertionText,
                 filterText, supportedPlatforms, properties, tags);
         }
 
@@ -307,7 +303,7 @@ namespace Microsoft.CodeAnalysis.Completion.Providers
         {
             return CreateWorker(
                 displayText, displayTextSuffix, symbols, rules, contextPosition,
-                AddSymbolInfo, sortText, insertionText,
+                s_addSymbolInfo, sortText, insertionText,
                 filterText, supportedPlatforms, properties, tags);
         }
 
@@ -327,8 +323,6 @@ namespace Microsoft.CodeAnalysis.Completion.Providers
 
             var position = GetDescriptionPosition(item);
             var supportedPlatforms = GetSupportedPlatforms(item, workspace);
-
-            var contextDocument = FindAppropriateDocumentForDescriptionContext(document, supportedPlatforms);
 
             if (symbols.Length != 0)
             {

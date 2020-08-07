@@ -5,11 +5,13 @@
 using System;
 using System.Collections.Generic;
 using System.ComponentModel.Composition;
+using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.Host.Mef;
 
 namespace Microsoft.VisualStudio.LanguageServices.Implementation.ProjectSystem.MetadataReferences
 {
@@ -45,15 +47,22 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.ProjectSystem.M
         private readonly Dictionary<string, CancellationTokenSource> _metadataReferenceRefreshCancellationTokenSources = new Dictionary<string, CancellationTokenSource>();
 
         [ImportingConstructor]
+        [Obsolete(MefConstruction.ImportingConstructorMessage, error: true)]
         public FileWatchedPortableExecutableReferenceFactory(
             Lazy<VisualStudioWorkspace> visualStudioWorkspace,
             FileChangeWatcherProvider fileChangeWatcherProvider)
         {
             _visualStudioWorkspace = visualStudioWorkspace;
 
-            // TODO: set this to watch the NuGet directory or the reference assemblies directory; since those change rarely and most references
-            // will come from them, we can avoid creating a bunch of explicit file watchers.
-            _fileReferenceChangeContext = fileChangeWatcherProvider.Watcher.CreateContext();
+            // We will do a single directory watch on the Reference Assemblies folder to avoid having to create separate file
+            // watches on individual .dlls that effectively never change.
+            var referenceAssembliesPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86), "Reference Assemblies", "Microsoft", "Framework");
+            var referenceAssemblies = new FileChangeWatcher.WatchedDirectory(referenceAssembliesPath, ".dll");
+
+            // TODO: set this to watch the NuGet directory as well; there's some concern that watching the entire directory
+            // might make restores take longer because we'll be watching changes that may not impact your project.
+
+            _fileReferenceChangeContext = fileChangeWatcherProvider.Watcher.CreateContext(referenceAssemblies);
             _fileReferenceChangeContext.FileChanged += FileReferenceChangeContext_FileChanged;
         }
 

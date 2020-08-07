@@ -7,6 +7,7 @@ using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
 using System.Security;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.CodeAnalysis;
@@ -23,7 +24,6 @@ using Microsoft.VisualStudio.Composition;
 using Microsoft.VisualStudio.InteractiveWindow;
 using Microsoft.VisualStudio.Language.Intellisense;
 using Microsoft.VisualStudio.Language.Intellisense.AsyncCompletion.Data;
-using Microsoft.VisualStudio.Text.Editor;
 using Moq;
 using Roslyn.Test.Utilities;
 using Roslyn.Utilities;
@@ -36,8 +36,11 @@ namespace Microsoft.CodeAnalysis.Editor.UnitTests.Completion
     public abstract class AbstractCompletionProviderTests<TWorkspaceFixture> : TestBase, IClassFixture<TWorkspaceFixture>
         where TWorkspaceFixture : TestWorkspaceFixture, new()
     {
+        private static readonly TestComposition s_baseComposition = EditorTestCompositions.EditorFeatures.AddExcludedPartTypes(typeof(CompletionProvider));
+
         protected readonly Mock<ICompletionSession> MockCompletionSession;
         protected TWorkspaceFixture WorkspaceFixture;
+        private ExportProvider _lazyExportProvider;
 
         protected AbstractCompletionProviderTests(TWorkspaceFixture workspaceFixture)
         {
@@ -45,6 +48,12 @@ namespace Microsoft.CodeAnalysis.Editor.UnitTests.Completion
 
             this.WorkspaceFixture = workspaceFixture;
         }
+
+        protected ExportProvider ExportProvider
+            => _lazyExportProvider ??= GetComposition().ExportProviderFactory.CreateExportProvider();
+
+        protected virtual TestComposition GetComposition()
+            => s_baseComposition.AddParts(GetCompletionProviderType());
 
         public override void Dispose()
         {
@@ -73,7 +82,7 @@ namespace Microsoft.CodeAnalysis.Editor.UnitTests.Completion
             return completionServiceWithProviders;
         }
 
-        internal ImmutableHashSet<string> GetRoles(Document document)
+        internal static ImmutableHashSet<string> GetRoles(Document document)
             => document.SourceCodeKind == SourceCodeKind.Regular ? ImmutableHashSet<string>.Empty : ImmutableHashSet.Create(PredefinedInteractiveTextViewRoles.InteractiveTextViewRole);
 
         protected abstract string ItemPartiallyWritten(string expectedItemOrNull);
@@ -86,7 +95,7 @@ namespace Microsoft.CodeAnalysis.Editor.UnitTests.Completion
             int? glyph, int? matchPriority, bool? hasSuggestionItem, string displayTextSuffix,
             string inlineDescription, List<CompletionFilter> matchingFilters, CompletionItemFlags? flags);
 
-        internal Task<RoslynCompletion.CompletionList> GetCompletionListAsync(
+        internal static Task<RoslynCompletion.CompletionList> GetCompletionListAsync(
             CompletionService service,
             Document document,
             int position,
@@ -165,44 +174,13 @@ namespace Microsoft.CodeAnalysis.Editor.UnitTests.Completion
             }
         }
 
-        private static readonly Dictionary<Type, IExportProviderFactory> _specificCompletionExportProviderFactories = new Dictionary<Type, IExportProviderFactory>();
-        private ExportProvider _exportProvider = null;
-
-        protected ExportProvider ExportProvider
-        {
-            get
-            {
-                return _exportProvider ??= GetExportProvider(this);
-
-                static ExportProvider GetExportProvider(AbstractCompletionProviderTests<TWorkspaceFixture> self)
-                {
-                    IExportProviderFactory factory;
-                    lock (_specificCompletionExportProviderFactories)
-                    {
-                        factory = _specificCompletionExportProviderFactories.GetOrAdd(
-                            self.GetType(),
-                            type => ExportProviderCache.GetOrCreateExportProviderFactory(self.GetExportCatalog()));
-                    }
-
-                    return factory.CreateExportProvider();
-                }
-            }
-        }
-
         protected void SetExperimentOption(string experimentName, bool enabled)
         {
             var mockExperimentService = ExportProvider.GetExportedValue<TestExperimentationService>();
             mockExperimentService.SetExperimentOption(experimentName, enabled);
         }
 
-        protected virtual ComposableCatalog GetExportCatalog()
-        {
-            var catalogWithoutCompletion = TestExportProvider.EntireAssemblyCatalogWithCSharpAndVisualBasic.WithoutPartsOfType(typeof(CompletionProvider));
-            var catalog = catalogWithoutCompletion.WithPart(GetCompletionProviderType());
-            return catalog;
-        }
-
-        private bool FiltersMatch(List<CompletionFilter> expectedMatchingFilters, RoslynCompletion.CompletionItem item)
+        private static bool FiltersMatch(List<CompletionFilter> expectedMatchingFilters, RoslynCompletion.CompletionItem item)
         {
             var matchingFilters = FilterSet.GetFilters(item);
 
@@ -259,8 +237,13 @@ namespace Microsoft.CodeAnalysis.Editor.UnitTests.Completion
             }
         }
 
-        protected async Task VerifyProviderCommitAsync(string markupBeforeCommit, string itemToCommit, string expectedCodeAfterCommit,
-            char? commitChar, string textTypedSoFar, SourceCodeKind? sourceCodeKind = null)
+        protected async Task VerifyProviderCommitAsync(
+            string markupBeforeCommit,
+            string itemToCommit,
+            string expectedCodeAfterCommit,
+            char? commitChar,
+            string textTypedSoFar,
+            SourceCodeKind? sourceCodeKind = null)
         {
             WorkspaceFixture.GetWorkspace(markupBeforeCommit, ExportProvider);
 
@@ -280,14 +263,10 @@ namespace Microsoft.CodeAnalysis.Editor.UnitTests.Completion
         }
 
         protected bool CompareItems(string actualItem, string expectedItem)
-        {
-            return GetStringComparer().Equals(actualItem, expectedItem);
-        }
+            => GetStringComparer().Equals(actualItem, expectedItem);
 
         protected virtual IEqualityComparer<string> GetStringComparer()
-        {
-            return StringComparer.Ordinal;
-        }
+            => StringComparer.Ordinal;
 
         private protected async Task VerifyItemExistsAsync(
             string markup, string expectedItem, string expectedDescriptionOrNull = null,
@@ -459,7 +438,7 @@ namespace Microsoft.CodeAnalysis.Editor.UnitTests.Completion
             return workspace.CurrentSolution.GetDocument(document.Id);
         }
 
-        private Document WithChangedOption(Document document, OptionKey optionKey, object value)
+        private static Document WithChangedOption(Document document, OptionKey optionKey, object value)
         {
             var workspace = document.Project.Solution.Workspace;
             var newOptions = workspace.Options.WithChangedOption(optionKey, value);
@@ -501,7 +480,7 @@ namespace Microsoft.CodeAnalysis.Editor.UnitTests.Completion
             var actualCodeAfterCommit = textBuffer.CurrentSnapshot.AsText().ToString();
             var caretPosition = commit.NewPosition ?? textView.Caret.Position.BufferPosition.Position;
 
-            Assert.Equal(actualExpectedCode, actualCodeAfterCommit);
+            AssertEx.EqualOrDiff(actualExpectedCode, actualCodeAfterCommit);
             Assert.Equal(expectedCaretPosition, caretPosition);
         }
 
@@ -613,10 +592,10 @@ namespace Microsoft.CodeAnalysis.Editor.UnitTests.Completion
             return VerifyItemWithReferenceWorkerAsync(xmlString, expectedItem, expectedSymbols, hideAdvancedMembers);
         }
 
-        protected static string GetMarkupWithReference(string currentFile, string referencedFile, string sourceLanguage, string referenceLanguage, bool isProjectReference, string alias = null)
+        protected static string GetMarkupWithReference(string currentFile, string referencedFile, string sourceLanguage, string referenceLanguage, bool isProjectReference)
         {
             return isProjectReference
-                ? CreateMarkupForProjecWithProjectReference(currentFile, referencedFile, sourceLanguage, referenceLanguage)
+                ? CreateMarkupForProjectWithProjectReference(currentFile, referencedFile, sourceLanguage, referenceLanguage)
                 : CreateMarkupForProjectWithMetadataReference(currentFile, referencedFile, sourceLanguage, referenceLanguage);
         }
 
@@ -657,12 +636,12 @@ namespace Microsoft.CodeAnalysis.Editor.UnitTests.Completion
 
         protected Task VerifyItemWithProjectReferenceAsync(string markup, string referencedCode, string expectedItem, int expectedSymbols, string sourceLanguage, string referencedLanguage, bool hideAdvancedMembers)
         {
-            var xmlString = CreateMarkupForProjecWithProjectReference(markup, referencedCode, sourceLanguage, referencedLanguage);
+            var xmlString = CreateMarkupForProjectWithProjectReference(markup, referencedCode, sourceLanguage, referencedLanguage);
 
             return VerifyItemWithReferenceWorkerAsync(xmlString, expectedItem, expectedSymbols, hideAdvancedMembers);
         }
 
-        protected static string CreateMarkupForProjecWithAliasedProjectReference(string markup, string projectAlias, string referencedCode, string sourceLanguage, string referencedLanguage)
+        protected static string CreateMarkupForProjectWithAliasedProjectReference(string markup, string projectAlias, string referencedCode, string sourceLanguage, string referencedLanguage)
         {
             return string.Format(@"
 <Workspace>
@@ -677,7 +656,7 @@ namespace Microsoft.CodeAnalysis.Editor.UnitTests.Completion
 </Workspace>", sourceLanguage, SecurityElement.Escape(markup), referencedLanguage, SecurityElement.Escape(referencedCode), SecurityElement.Escape(projectAlias));
         }
 
-        protected static string CreateMarkupForProjecWithProjectReference(string markup, string referencedCode, string sourceLanguage, string referencedLanguage)
+        protected static string CreateMarkupForProjectWithProjectReference(string markup, string referencedCode, string sourceLanguage, string referencedLanguage)
         {
             return string.Format(@"
 <Workspace>
@@ -690,6 +669,43 @@ namespace Microsoft.CodeAnalysis.Editor.UnitTests.Completion
     </Project>
     
 </Workspace>", sourceLanguage, SecurityElement.Escape(markup), referencedLanguage, SecurityElement.Escape(referencedCode));
+        }
+
+        protected static string CreateMarkupForProjectWithMultupleProjectReferences(string sourceText, string sourceLanguage, string referencedLanguage, string[] referencedTexts)
+        {
+            return $@"
+<Workspace>
+    <Project Language=""{sourceLanguage}"" CommonReferences=""true"" AssemblyName=""Project1"">
+{GetProjectReferenceElements(referencedTexts)}
+        <Document FilePath=""SourceDocument"">{SecurityElement.Escape(sourceText)}</Document>
+    </Project>
+{GetReferencedProjectElements(referencedLanguage, referencedTexts)}
+</Workspace>";
+
+            static string GetProjectReferenceElements(string[] referencedTexts)
+            {
+                var builder = new StringBuilder();
+                for (var i = 0; i < referencedTexts.Length; ++i)
+                {
+                    builder.AppendLine($"<ProjectReference>ReferencedProject{i}</ProjectReference>");
+                }
+
+                return builder.ToString();
+            }
+
+            static string GetReferencedProjectElements(string language, string[] referencedTexts)
+            {
+                var builder = new StringBuilder();
+                for (var i = 0; i < referencedTexts.Length; ++i)
+                {
+                    builder.Append($@"
+<Project Language=""{language}"" CommonReferences=""true"" AssemblyName=""ReferencedProject{i}"" IncludeXmlDocComments=""true"" DocumentationMode=""Diagnose"">
+  <Document FilePath=""ReferencedDocument{i}"">{SecurityElement.Escape(referencedTexts[i])}</Document>
+</Project>");
+                }
+
+                return builder.ToString();
+            }
         }
 
         protected static string CreateMarkupForProjecWithVBProjectReference(string markup, string referencedCode, string sourceLanguage, string rootNamespace = "")
@@ -746,6 +762,7 @@ namespace Microsoft.CodeAnalysis.Editor.UnitTests.Completion
 
                 if (expectedSymbols >= 1)
                 {
+                    Assert.NotNull(completionList);
                     AssertEx.Any(completionList.Items, c => CompareItems(c.DisplayText, expectedItem));
 
                     var item = completionList.Items.First(c => CompareItems(c.DisplayText, expectedItem));
@@ -805,7 +822,7 @@ namespace Microsoft.CodeAnalysis.Editor.UnitTests.Completion
 
         private const char NonBreakingSpace = (char)0x00A0;
 
-        private string GetExpectedOverloadSubstring(int expectedSymbols)
+        private static string GetExpectedOverloadSubstring(int expectedSymbols)
         {
             if (expectedSymbols <= 1)
             {
@@ -962,7 +979,7 @@ namespace Microsoft.CodeAnalysis.Editor.UnitTests.Completion
                 var position = hostDocument.CursorPosition.Value;
                 var text = hostDocument.GetTextBuffer().CurrentSnapshot.AsText();
                 var options = workspace.Options
-                    .WithChangedOption(CompletionOptions.TriggerOnTypingLetters, hostDocument.Project.Language, triggerOnLetter)
+                    .WithChangedOption(CompletionOptions.TriggerOnTypingLetters2, hostDocument.Project.Language, triggerOnLetter)
                     .WithChangedOption(CompletionOptions.TriggerInArgumentLists, hostDocument.Project.Language, showCompletionInArgumentLists);
                 var trigger = RoslynCompletion.CompletionTrigger.CreateInsertionTrigger(text[position]);
 

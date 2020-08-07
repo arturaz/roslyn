@@ -65,9 +65,7 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.TableDataSource
         }
 
         protected override void ShutdownSource()
-        {
-            _source.Shutdown();
-        }
+            => _source.Shutdown();
 
         private class TableDataSource : AbstractRoslynTableDataSource<TodoTableItem>
         {
@@ -141,9 +139,7 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.TableDataSource
             }
 
             public override AbstractTableEntriesSnapshot<TodoTableItem> CreateSnapshot(AbstractTableEntriesSource<TodoTableItem> source, int version, ImmutableArray<TodoTableItem> items, ImmutableArray<ITrackingPoint> trackingPoints)
-            {
-                return new TableEntriesSnapshot(version, items, trackingPoints);
-            }
+                => new TableEntriesSnapshot(version, items, trackingPoints);
 
             public override IEqualityComparer<TodoTableItem> GroupingComparer
                 => TodoTableItem.GroupingComparer.Instance;
@@ -209,9 +205,7 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.TableDataSource
                 }
 
                 public override ImmutableArray<ITrackingPoint> GetTrackingPoints(ImmutableArray<TodoTableItem> items)
-                {
-                    return _workspace.CreateTrackingPoints(_documentId, items);
-                }
+                    => _workspace.CreateTrackingPoints(_documentId, items);
             }
 
             private sealed class TableEntriesSnapshot : AbstractTableEntriesSnapshot<TodoTableItem>
@@ -286,8 +280,8 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.TableDataSource
                         item.Data.MappedColumn);
                 }
 
-                public override bool TryNavigateTo(int index, bool previewTab)
-                    => TryNavigateToItem(index, previewTab);
+                public override bool TryNavigateTo(int index, bool previewTab, bool activate)
+                    => TryNavigateToItem(index, previewTab, activate);
             }
         }
     }

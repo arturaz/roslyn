@@ -42,9 +42,7 @@ namespace Microsoft.CodeAnalysis.MoveToNamespace
         public IMoveToNamespaceOptionsService OptionsService { get; }
 
         protected AbstractMoveToNamespaceService(IMoveToNamespaceOptionsService moveToNamespaceOptionsService)
-        {
-            OptionsService = moveToNamespaceOptionsService;
-        }
+            => OptionsService = moveToNamespaceOptionsService;
 
         public async Task<ImmutableArray<AbstractMoveToNamespaceCodeAction>> GetCodeActionsAsync(
             Document document,
@@ -71,7 +69,7 @@ namespace Microsoft.CodeAnalysis.MoveToNamespace
             int position,
             CancellationToken cancellationToken)
         {
-            var root = await document.GetSyntaxRootAsync().ConfigureAwait(false);
+            var root = await document.GetSyntaxRootAsync(cancellationToken).ConfigureAwait(false);
 
             var token = root.FindToken(position);
             var node = token.Parent;
@@ -173,15 +171,12 @@ namespace Microsoft.CodeAnalysis.MoveToNamespace
                 return Task.FromResult(MoveToNamespaceResult.Failed);
             }
 
-            switch (analysisResult.Container)
+            return analysisResult.Container switch
             {
-                case MoveToNamespaceAnalysisResult.ContainerType.Namespace:
-                    return MoveItemsInNamespaceAsync(analysisResult.Document, analysisResult.SyntaxNode, targetNamespace, cancellationToken);
-                case MoveToNamespaceAnalysisResult.ContainerType.NamedType:
-                    return MoveTypeToNamespaceAsync(analysisResult.Document, analysisResult.SyntaxNode, targetNamespace, cancellationToken);
-                default:
-                    throw new InvalidOperationException();
-            }
+                MoveToNamespaceAnalysisResult.ContainerType.Namespace => MoveItemsInNamespaceAsync(analysisResult.Document, analysisResult.SyntaxNode, targetNamespace, cancellationToken),
+                MoveToNamespaceAnalysisResult.ContainerType.NamedType => MoveTypeToNamespaceAsync(analysisResult.Document, analysisResult.SyntaxNode, targetNamespace, cancellationToken),
+                _ => throw new InvalidOperationException(),
+            };
         }
 
         private static async Task<ImmutableArray<ISymbol>> GetMemberSymbolsAsync(Document document, SyntaxNode container, CancellationToken cancellationToken)
@@ -190,7 +185,7 @@ namespace Microsoft.CodeAnalysis.MoveToNamespace
             switch (container)
             {
                 case TNamespaceDeclarationSyntax namespaceNode:
-                    var containerSymbol = (INamespaceSymbol)semanticModel.GetDeclaredSymbol(container);
+                    var containerSymbol = (INamespaceSymbol)semanticModel.GetDeclaredSymbol(container, cancellationToken);
                     return containerSymbol.GetMembers().SelectAsArray(m => (ISymbol)m);
 
                 case TCompilationUnitSyntax compilationUnit:
@@ -200,7 +195,7 @@ namespace Microsoft.CodeAnalysis.MoveToNamespace
                     // This is supported if the selected type is the only member declared in the global namespace in this document.
                     // (See `TryAnalyzeNamedTypeAsync`)
                     Debug.Assert(members.Count == 1);
-                    return members.SelectAsArray(member => semanticModel.GetDeclaredSymbol(member));
+                    return members.SelectAsArray(member => semanticModel.GetDeclaredSymbol(member, cancellationToken));
 
                 default:
                     throw ExceptionUtilities.UnexpectedValue(container);

@@ -7,7 +7,6 @@ using System.Collections.Generic;
 using System.Threading;
 using Microsoft.CodeAnalysis.Host;
 using Microsoft.CodeAnalysis.Text;
-using Roslyn.Utilities;
 
 namespace Microsoft.CodeAnalysis
 {
@@ -17,7 +16,7 @@ namespace Microsoft.CodeAnalysis
     /// </summary>
     public sealed class AdhocWorkspace : Workspace
     {
-        public AdhocWorkspace(HostServices host, string workspaceKind = "Custom")
+        public AdhocWorkspace(HostServices host, string workspaceKind = WorkspaceKind.Custom)
             : base(host, workspaceKind)
         {
         }
@@ -42,9 +41,7 @@ namespace Microsoft.CodeAnalysis
         /// Clears all projects and documents from the workspace.
         /// </summary>
         public new void ClearSolution()
-        {
-            base.ClearSolution();
-        }
+            => base.ClearSolution();
 
         /// <summary>
         /// Adds an entire solution to the workspace, replacing any existing solution.

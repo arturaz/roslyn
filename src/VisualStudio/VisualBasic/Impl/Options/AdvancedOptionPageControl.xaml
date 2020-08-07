@@ -94,6 +94,8 @@
             <GroupBox x:Uid="EditorHelpGroupBox"
                       Header="{x:Static local:AdvancedOptionPageStrings.Option_EditorHelp}">
                 <StackPanel>
+                    <CheckBox x:Name="DisplayInlineParameterNameHints"
+                              Content="{x:Static local:AdvancedOptionPageStrings.Option_Display_inline_parameter_name_hints}" />
                     <CheckBox x:Name="EnableLineCommit"
                               Content="{x:Static local:AdvancedOptionPageStrings.Option_EnableLineCommit}" />
                     <CheckBox x:Name="EnableEndConstruct"
@@ -102,6 +104,8 @@
                               Content="{x:Static local:AdvancedOptionPageStrings.Option_AutomaticInsertionOfInterfaceAndMustOverrideMembers}" />
                     <CheckBox x:Name="GenerateXmlDocCommentsForTripleApostrophes"
                               Content="{x:Static local:AdvancedOptionPageStrings.Option_GenerateXmlDocCommentsForTripleApostrophes}" />
+                    <CheckBox x:Name="ShowRemarksInQuickInfo"
+                              Content="{x:Static local:AdvancedOptionPageStrings.Option_ShowRemarksInQuickInfo}" />
                     <CheckBox x:Name="RenameTrackingPreview"
                               Content="{x:Static local:AdvancedOptionPageStrings.Option_RenameTrackingPreview}" />
                     <CheckBox x:Name="Report_invalid_placeholders_in_string_dot_format_calls"

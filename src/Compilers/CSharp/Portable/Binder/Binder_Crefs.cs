@@ -278,8 +278,8 @@ namespace Microsoft.CodeAnalysis.CSharp
             TypeSymbol returnType = BindCrefParameterOrReturnType(syntax.Type, syntax, diagnostics);
 
             // Filter out methods with the wrong return type, since overload resolution won't catch these.
-            sortedSymbols = sortedSymbols.WhereAsArray(symbol =>
-                symbol.Kind != SymbolKind.Method || TypeSymbol.Equals(((MethodSymbol)symbol).ReturnType, returnType, TypeCompareKind.ConsiderEverything2));
+            sortedSymbols = sortedSymbols.WhereAsArray((symbol, returnType) =>
+                symbol.Kind != SymbolKind.Method || TypeSymbol.Equals(((MethodSymbol)symbol).ReturnType, returnType, TypeCompareKind.ConsiderEverything2), returnType);
 
             if (!sortedSymbols.Any())
             {
@@ -524,6 +524,22 @@ namespace Microsoft.CodeAnalysis.CSharp
                     return ContainsNestedTypeOfUnconstructedGenericType(((ArrayTypeSymbol)type).ElementType);
                 case TypeKind.Pointer:
                     return ContainsNestedTypeOfUnconstructedGenericType(((PointerTypeSymbol)type).PointedAtType);
+                case TypeKind.FunctionPointer:
+                    MethodSymbol signature = ((FunctionPointerTypeSymbol)type).Signature;
+                    if (ContainsNestedTypeOfUnconstructedGenericType(signature.ReturnType))
+                    {
+                        return true;
+                    }
+
+                    foreach (var param in signature.Parameters)
+                    {
+                        if (ContainsNestedTypeOfUnconstructedGenericType(param.Type))
+                        {
+                            return true;
+                        }
+                    }
+
+                    return false;
                 case TypeKind.Delegate:
                 case TypeKind.Class:
                 case TypeKind.Interface:
@@ -743,6 +759,7 @@ namespace Microsoft.CodeAnalysis.CSharp
                                 containingType: null,
                                 name: null,
                                 refKind: RefKind.None,
+                                isInitOnly: false,
                                 returnType: default,
                                 refCustomModifiers: ImmutableArray<CustomModifier>.Empty,
                                 explicitInterfaceImplementations: ImmutableArray<MethodSymbol>.Empty);
@@ -874,6 +891,7 @@ namespace Microsoft.CodeAnalysis.CSharp
             {
                 RefKind refKind = parameter.RefKindKeyword.Kind().GetRefKind();
 
+                Debug.Assert(parameterListSyntax.Parent is object);
                 TypeSymbol type = BindCrefParameterOrReturnType(parameter.Type, (MemberCrefSyntax)parameterListSyntax.Parent, diagnostics);
 
                 parameterBuilder.Add(new SignatureOnlyParameterSymbol(TypeWithAnnotations.Create(type), ImmutableArray<CustomModifier>.Empty, isParams: false, refKind: refKind));
@@ -909,6 +927,7 @@ namespace Microsoft.CodeAnalysis.CSharp
             {
                 if (HasNonObsoleteError(unusedDiagnostics))
                 {
+                    Debug.Assert(typeSyntax.Parent is object);
                     ErrorCode code = typeSyntax.Parent.Kind() == SyntaxKind.ConversionOperatorMemberCref
                         ? ErrorCode.WRN_BadXMLRefReturnType
                         : ErrorCode.WRN_BadXMLRefParamType;
@@ -950,7 +969,7 @@ namespace Microsoft.CodeAnalysis.CSharp
 
         private static CrefSyntax GetRootCrefSyntax(MemberCrefSyntax syntax)
         {
-            SyntaxNode parentSyntax = syntax.Parent; // Could be null when speculating.
+            SyntaxNode? parentSyntax = syntax.Parent; // Could be null when speculating.
             return parentSyntax == null || parentSyntax.IsKind(SyntaxKind.XmlCrefAttribute)
                 ? syntax
                 : (CrefSyntax)parentSyntax;

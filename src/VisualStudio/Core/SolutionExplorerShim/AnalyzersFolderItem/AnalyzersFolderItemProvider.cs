@@ -32,6 +32,7 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.SolutionExplore
         private Workspace _workspace;
 
         [ImportingConstructor]
+        [SuppressMessage("RoslynDiagnosticsReliability", "RS0033:Importing constructor should be [Obsolete]", Justification = "Used in test code: https://github.com/dotnet/roslyn/issues/42814")]
         public AnalyzersFolderItemProvider(
             [Import(typeof(SVsServiceProvider))] IServiceProvider serviceProvider,
             [Import(typeof(AnalyzersCommandHandler))] IAnalyzersCommandHandler commandHandler)
@@ -83,19 +84,6 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.SolutionExplore
             }
 
             return null;
-        }
-
-        private static ImmutableArray<string> GetProjectCapabilities(IVsHierarchy hierarchy)
-        {
-            if (hierarchy.GetProperty((uint)VSConstants.VSITEMID.Root, (int)__VSHPROPID5.VSHPROPID_ProjectCapabilities, out var capabilitiesObj) == VSConstants.S_OK)
-            {
-                var capabilitiesString = (string)capabilitiesObj;
-                return ImmutableArray.Create(capabilitiesString.Split(' '));
-            }
-            else
-            {
-                return ImmutableArray<string>.Empty;
-            }
         }
 
         private static ImmutableArray<string> GetProjectTreeCapabilities(IVsHierarchy hierarchy, uint itemId)

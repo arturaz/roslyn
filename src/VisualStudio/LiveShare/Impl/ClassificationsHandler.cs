@@ -9,6 +9,8 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Classification;
+using Microsoft.CodeAnalysis.Host.Mef;
+using Microsoft.CodeAnalysis.LanguageServer;
 using Microsoft.CodeAnalysis.Text;
 using Microsoft.VisualStudio.LanguageServices.LiveShare.CustomProtocol;
 using Microsoft.VisualStudio.LiveShare.LanguageServices;
@@ -23,10 +25,12 @@ namespace Microsoft.VisualStudio.LanguageServices.LiveShare
     /// </summary>
     internal class ClassificationsHandler : AbstractClassificationsHandler
     {
-        protected override async Task AddClassificationsAsync(IClassificationService classificationService, Document document, TextSpan textSpan, List<ClassifiedSpan> spans, CancellationToken cancellationToken)
+        public ClassificationsHandler(ILspSolutionProvider solutionProvider) : base(solutionProvider)
         {
-            await classificationService.AddSemanticClassificationsAsync(document, textSpan, spans, cancellationToken).ConfigureAwait(false);
         }
+
+        protected override async Task AddClassificationsAsync(IClassificationService classificationService, Document document, TextSpan textSpan, List<ClassifiedSpan> spans, CancellationToken cancellationToken)
+            => await classificationService.AddSemanticClassificationsAsync(document, textSpan, spans, cancellationToken).ConfigureAwait(false);
     }
 
     [ExportLspRequestHandler(LiveShareConstants.RoslynContractName, RoslynMethods.ClassificationsName)]
@@ -34,7 +38,8 @@ namespace Microsoft.VisualStudio.LanguageServices.LiveShare
     internal class RoslynClassificationsHandler : ClassificationsHandler
     {
         [ImportingConstructor]
-        public RoslynClassificationsHandler()
+        [Obsolete(MefConstruction.ImportingConstructorMessage, error: true)]
+        public RoslynClassificationsHandler(ILspSolutionProvider solutionProvider) : base(solutionProvider)
         {
         }
     }
@@ -43,7 +48,8 @@ namespace Microsoft.VisualStudio.LanguageServices.LiveShare
     internal class CSharpClassificationsHandler : ClassificationsHandler
     {
         [ImportingConstructor]
-        public CSharpClassificationsHandler()
+        [Obsolete(MefConstruction.ImportingConstructorMessage, error: true)]
+        public CSharpClassificationsHandler(ILspSolutionProvider solutionProvider) : base(solutionProvider)
         {
         }
     }
@@ -52,7 +58,8 @@ namespace Microsoft.VisualStudio.LanguageServices.LiveShare
     internal class VisualBasicClassificationsHandler : ClassificationsHandler
     {
         [ImportingConstructor]
-        public VisualBasicClassificationsHandler()
+        [Obsolete(MefConstruction.ImportingConstructorMessage, error: true)]
+        public VisualBasicClassificationsHandler(ILspSolutionProvider solutionProvider) : base(solutionProvider)
         {
         }
     }
@@ -61,7 +68,8 @@ namespace Microsoft.VisualStudio.LanguageServices.LiveShare
     internal class TypeScriptClassificationsHandler : ClassificationsHandler
     {
         [ImportingConstructor]
-        public TypeScriptClassificationsHandler()
+        [Obsolete(MefConstruction.ImportingConstructorMessage, error: true)]
+        public TypeScriptClassificationsHandler(ILspSolutionProvider solutionProvider) : base(solutionProvider)
         {
         }
     }

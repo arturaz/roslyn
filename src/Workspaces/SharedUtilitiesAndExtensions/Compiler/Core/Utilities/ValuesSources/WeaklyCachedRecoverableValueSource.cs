@@ -27,9 +27,7 @@ namespace Microsoft.CodeAnalysis.Host
         private ValueSource<T> _recoverySource;
 
         public WeaklyCachedRecoverableValueSource(ValueSource<T> initialValue)
-        {
-            _recoverySource = initialValue;
-        }
+            => _recoverySource = initialValue;
 
         public WeaklyCachedRecoverableValueSource(WeaklyCachedRecoverableValueSource<T> savedSource)
         {
@@ -163,7 +161,9 @@ namespace Microsoft.CodeAnalysis.Host
                 }
             }
 
+#pragma warning disable VSTHRD114 // Avoid returning a null Task (False positive: https://github.com/microsoft/vs-threading/issues/637)
             return null;
+#pragma warning restore VSTHRD114 // Avoid returning a null Task
         }
     }
 }

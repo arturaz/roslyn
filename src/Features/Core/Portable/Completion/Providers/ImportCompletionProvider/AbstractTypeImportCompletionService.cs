@@ -32,9 +32,7 @@ namespace Microsoft.CodeAnalysis.Completion.Providers.ImportCompletion
         protected abstract bool IsCaseSensitive { get; }
 
         internal AbstractTypeImportCompletionService(Workspace workspace)
-        {
-            CacheService = workspace.Services.GetRequiredService<IImportCompletionCacheService<CacheEntry, CacheEntry>>();
-        }
+            => CacheService = workspace.Services.GetRequiredService<IImportCompletionCacheService<CacheEntry, CacheEntry>>();
 
         public async Task<ImmutableArray<ImmutableArray<CompletionItem>>?> GetAllTopLevelTypesAsync(
             Project currentProject,
@@ -92,7 +90,7 @@ namespace Microsoft.CodeAnalysis.Completion.Providers.ImportCompletion
             foreach (var referencedProject in referencedProjects.Where(p => p.SupportsCompilation))
             {
                 var compilation = await referencedProject.GetRequiredCompilationAsync(cancellationToken).ConfigureAwait(false);
-                var assembly = SymbolFinder.FindSimilarSymbols(compilation.Assembly, currentCompilation).SingleOrDefault();
+                var assembly = SymbolFinder.FindSimilarSymbols(compilation.Assembly, currentCompilation, cancellationToken).SingleOrDefault();
                 var metadataReference = currentCompilation.GetMetadataReference(assembly);
 
                 if (HasGlobalAlias(metadataReference))
@@ -217,6 +215,7 @@ namespace Microsoft.CodeAnalysis.Completion.Providers.ImportCompletion
             bool forceCacheCreation,
             IDictionary<TKey, CacheEntry> cache,
             CancellationToken cancellationToken)
+            where TKey : notnull
         {
             var language = syntaxContext.SemanticModel.Language;
 
@@ -374,9 +373,7 @@ namespace Microsoft.CodeAnalysis.Completion.Providers.ImportCompletion
                 => (_properties & ItemPropertyKind.IsAttribute) != 0;
 
             public TypeImportCompletionItemInfo WithItem(CompletionItem item)
-            {
-                return new TypeImportCompletionItemInfo(item, IsPublic, IsGeneric, IsAttribute);
-            }
+                => new TypeImportCompletionItemInfo(item, IsPublic, IsGeneric, IsAttribute);
 
             [Flags]
             private enum ItemPropertyKind : byte

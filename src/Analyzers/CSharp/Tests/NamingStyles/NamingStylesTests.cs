@@ -9,7 +9,6 @@ using Microsoft.CodeAnalysis.CodeFixes;
 using Microsoft.CodeAnalysis.CodeFixes.NamingStyles;
 using Microsoft.CodeAnalysis.CSharp.Diagnostics.NamingStyles;
 using Microsoft.CodeAnalysis.Diagnostics;
-using Microsoft.CodeAnalysis.Diagnostics.Analyzers.NamingStyles;
 using Microsoft.CodeAnalysis.Editor.UnitTests.Diagnostics.NamingStyles;
 using Microsoft.CodeAnalysis.Editor.UnitTests.Workspaces;
 using Microsoft.CodeAnalysis.Test.Utilities;
@@ -20,10 +19,13 @@ namespace Microsoft.CodeAnalysis.Editor.CSharp.UnitTests.Diagnostics.NamingStyle
 {
     public class NamingStylesTests : AbstractCSharpDiagnosticProviderBasedUserDiagnosticTest
     {
-        private readonly NamingStylesTestOptionSets options = new NamingStylesTestOptionSets(LanguageNames.CSharp);
+        private static readonly NamingStylesTestOptionSets s_options = new NamingStylesTestOptionSets(LanguageNames.CSharp);
+        private static readonly TestComposition s_composition = FeaturesTestCompositions.Features.AddParts(typeof(TestSymbolRenamedCodeActionOperationFactoryWorkspaceService));
 
         internal override (DiagnosticAnalyzer, CodeFixProvider) CreateDiagnosticProviderAndFixer(Workspace workspace)
             => (new CSharpNamingStyleDiagnosticAnalyzer(), new NamingStyleCodeFixProvider());
+
+        protected override TestComposition GetComposition() => s_composition;
 
         [Fact, Trait(Traits.Feature, Traits.Features.NamingStyle)]
         public async Task TestPascalCaseClass_CorrectName()
@@ -31,7 +33,7 @@ namespace Microsoft.CodeAnalysis.Editor.CSharp.UnitTests.Diagnostics.NamingStyle
             await TestMissingInRegularAndScriptAsync(
 @"class [|C|]
 {
-}", new TestParameters(options: options.ClassNamesArePascalCase));
+}", new TestParameters(options: s_options.ClassNamesArePascalCase));
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.NamingStyle)]
@@ -44,7 +46,7 @@ namespace Microsoft.CodeAnalysis.Editor.CSharp.UnitTests.Diagnostics.NamingStyle
 @"class C
 {
 }",
-                options: options.ClassNamesArePascalCase);
+                options: s_options.ClassNamesArePascalCase);
         }
 
         [Theory, Trait(Traits.Feature, Traits.Features.NamingStyle)]
@@ -77,7 +79,7 @@ $@"class C
 {{
     int [|{correctedName}|];
 }}",
-                options: options.FieldNamesAreCamelCase);
+                options: s_options.FieldNamesAreCamelCase);
         }
 
         [Theory, Trait(Traits.Feature, Traits.Features.NamingStyle)]
@@ -111,7 +113,7 @@ $@"class C
 {{
     int [|{correctedName}|];
 }}",
-                options: options.FieldNamesAreCamelCaseWithUnderscorePrefix);
+                options: s_options.FieldNamesAreCamelCaseWithUnderscorePrefix);
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.NamingStyle)]
@@ -123,7 +125,7 @@ $@"class C
     void [|M|]()
     {
     }
-}", new TestParameters(options: options.MethodNamesArePascalCase));
+}", new TestParameters(options: s_options.MethodNamesArePascalCase));
         }
 
         [Theory, Trait(Traits.Feature, Traits.Features.NamingStyle)]
@@ -143,7 +145,7 @@ $@"class C
     {accessibility} void [|m|]()
     {{
     }}
-}}", new TestParameters(options: options.MethodNamesWithAccessibilityArePascalCase(ImmutableArray<Accessibility>.Empty)));
+}}", new TestParameters(options: s_options.MethodNamesWithAccessibilityArePascalCase(ImmutableArray<Accessibility>.Empty)));
 
             await TestInRegularAndScriptAsync(
 $@"class C
@@ -157,7 +159,7 @@ $@"class C
     {accessibility} void M()
     {{
     }}
-}}", options: options.MethodNamesWithAccessibilityArePascalCase(accessibilities: default));
+}}", options: s_options.MethodNamesWithAccessibilityArePascalCase(accessibilities: default));
         }
 
         [Theory, Trait(Traits.Feature, Traits.Features.NamingStyle)]
@@ -183,7 +185,7 @@ $@"class C
 $@"class C
 {{
     {camelCaseSymbol}
-}}", new TestParameters(options: options.SymbolKindsArePascalCaseEmpty()));
+}}", new TestParameters(options: s_options.SymbolKindsArePascalCaseEmpty()));
 
             await TestInRegularAndScriptAsync(
 $@"class C
@@ -193,7 +195,7 @@ $@"class C
 $@"class C
 {{
     {pascalCaseSymbol}
-}}", options: options.SymbolKindsArePascalCase(symbolKinds: default));
+}}", options: s_options.SymbolKindsArePascalCase(symbolKinds: default));
         }
 
         [Theory, Trait(Traits.Feature, Traits.Features.NamingStyle)]
@@ -228,14 +230,14 @@ $@"class C
 $@"class C
 {{
     {camelCaseSymbol}
-}}", new TestParameters(options: options.SymbolKindsArePascalCase(alternateSymbolKind)));
+}}", new TestParameters(options: s_options.SymbolKindsArePascalCase(alternateSymbolKind)));
 
             // Verify that no diagnostic is reported if the accessibility is wrong
             await TestMissingInRegularAndScriptAsync(
 $@"class C
 {{
     {camelCaseSymbol}
-}}", new TestParameters(options: options.AccessibilitiesArePascalCase(ImmutableArray.Create(alternateAccessibility))));
+}}", new TestParameters(options: s_options.AccessibilitiesArePascalCase(ImmutableArray.Create(alternateAccessibility))));
 
             await TestInRegularAndScriptAsync(
 $@"class C
@@ -245,7 +247,7 @@ $@"class C
 $@"class C
 {{
     {pascalCaseSymbol}
-}}", options: options.AccessibilitiesArePascalCase(ImmutableArray.Create(accessibility)));
+}}", options: s_options.AccessibilitiesArePascalCase(ImmutableArray.Create(accessibility)));
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.NamingStyle)]
@@ -264,7 +266,7 @@ $@"class C
     {
     }
 }",
-                options: options.MethodNamesArePascalCase);
+                options: s_options.MethodNamesArePascalCase);
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.NamingStyle)]
@@ -276,7 +278,7 @@ $@"class C
     public [|c|]()
     {
     }
-}", new TestParameters(options: options.MethodNamesArePascalCase));
+}", new TestParameters(options: s_options.MethodNamesArePascalCase));
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.NamingStyle)]
@@ -286,7 +288,7 @@ $@"class C
 @"class C
 {
     public int P { [|get|]; set; }
-}", new TestParameters(options: options.MethodNamesArePascalCase));
+}", new TestParameters(options: s_options.MethodNamesArePascalCase));
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.NamingStyle)]
@@ -302,7 +304,7 @@ $@"class C
             return 1;
         }
     }
-}", new TestParameters(options: options.MethodNamesArePascalCase));
+}", new TestParameters(options: s_options.MethodNamesArePascalCase));
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.NamingStyle)]
@@ -317,7 +319,7 @@ $@"class C
         {
         }
     }
-}", new TestParameters(options: options.MethodNamesArePascalCase));
+}", new TestParameters(options: s_options.MethodNamesArePascalCase));
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.NamingStyle)]
@@ -336,7 +338,7 @@ $@"class C
     {
     }
 }",
-                options: options.ParameterNamesAreCamelCase);
+                options: s_options.ParameterNamesAreCamelCase);
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.NamingStyle)]
@@ -357,7 +359,7 @@ $@"class C
         int x;
     }
 }",
-                options: options.LocalNamesAreCamelCase);
+                options: s_options.LocalNamesAreCamelCase);
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.NamingStyle)]
@@ -378,7 +380,7 @@ $@"class C
         int X, y = 0;
     }
 }",
-                options: options.LocalNamesAreCamelCase);
+                options: s_options.LocalNamesAreCamelCase);
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.NamingStyle)]
@@ -403,7 +405,7 @@ $@"class C
         }
     }
 }",
-                options: options.LocalNamesAreCamelCase);
+                options: s_options.LocalNamesAreCamelCase);
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.NamingStyle)]
@@ -428,7 +430,7 @@ $@"class C
         }
     }
 }",
-                options: options.LocalNamesAreCamelCase);
+                options: s_options.LocalNamesAreCamelCase);
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.NamingStyle)]
@@ -453,7 +455,7 @@ $@"class C
         }
     }
 }",
-                options: options.LocalNamesAreCamelCase);
+                options: s_options.LocalNamesAreCamelCase);
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.NamingStyle)]
@@ -478,7 +480,7 @@ $@"class C
         }
     }
 }",
-                options: options.LocalNamesAreCamelCase);
+                options: s_options.LocalNamesAreCamelCase);
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.NamingStyle)]
@@ -503,7 +505,7 @@ $@"class C
         }
     }
 }",
-                options: options.LocalNamesAreCamelCase);
+                options: s_options.LocalNamesAreCamelCase);
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.NamingStyle)]
@@ -536,7 +538,7 @@ class C
         }
     }
 }",
-                options: options.LocalNamesAreCamelCase);
+                options: s_options.LocalNamesAreCamelCase);
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.NamingStyle)]
@@ -555,7 +557,7 @@ class C
         {
         }
     }
-}", new TestParameters(options: options.LocalNamesAreCamelCase));
+}", new TestParameters(options: s_options.LocalNamesAreCamelCase));
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.NamingStyle)]
@@ -574,7 +576,7 @@ class C
         {
         }
     }
-}", new TestParameters(options: options.LocalNamesAreCamelCase));
+}", new TestParameters(options: s_options.LocalNamesAreCamelCase));
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.NamingStyle)]
@@ -597,7 +599,7 @@ class C
         System.Console.WriteLine(A + b + C);
     }
 }",
-                options: options.LocalNamesAreCamelCase);
+                options: s_options.LocalNamesAreCamelCase);
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.NamingStyle)]
@@ -620,7 +622,7 @@ class C
         System.Console.WriteLine(A + B + c);
     }
 }",
-                options: options.LocalNamesAreCamelCase);
+                options: s_options.LocalNamesAreCamelCase);
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.NamingStyle)]
@@ -643,7 +645,7 @@ class C
             System.Console.WriteLine(A + b + C);
     }
 }",
-                options: options.LocalNamesAreCamelCase);
+                options: s_options.LocalNamesAreCamelCase);
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.NamingStyle)]
@@ -666,7 +668,7 @@ class C
             System.Console.WriteLine(A + B + c);
     }
 }",
-                options: options.LocalNamesAreCamelCase);
+                options: s_options.LocalNamesAreCamelCase);
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.NamingStyle)]
@@ -689,7 +691,7 @@ class C
             System.Console.WriteLine(value);
     }
 }",
-                options: options.LocalNamesAreCamelCase);
+                options: s_options.LocalNamesAreCamelCase);
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.NamingStyle)]
@@ -712,7 +714,7 @@ class C
             System.Console.WriteLine(value);
     }
 }",
-                options: options.LocalNamesAreCamelCase);
+                options: s_options.LocalNamesAreCamelCase);
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.NamingStyle)]
@@ -731,7 +733,7 @@ class C
             let Number = int.Parse(STRING)
             select Number * Number;
     }
-}", new TestParameters(options: options.LocalNamesAreCamelCase));
+}", new TestParameters(options: s_options.LocalNamesAreCamelCase));
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.NamingStyle)]
@@ -750,7 +752,7 @@ class C
             let [|Number|] = int.Parse(STRING)
             select Number * Number;
     }
-}", new TestParameters(options: options.LocalNamesAreCamelCase));
+}", new TestParameters(options: s_options.LocalNamesAreCamelCase));
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.NamingStyle)]
@@ -762,7 +764,7 @@ class C
     void M(int [|X|])
     {
     }
-}", new TestParameters(options: options.LocalNamesAreCamelCase));
+}", new TestParameters(options: s_options.LocalNamesAreCamelCase));
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.NamingStyle)]
@@ -775,7 +777,7 @@ class C
     {
         (int [|A|], string B) tuple;
     }
-}", new TestParameters(options: options.LocalNamesAreCamelCase));
+}", new TestParameters(options: s_options.LocalNamesAreCamelCase));
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.NamingStyle)]
@@ -788,7 +790,7 @@ class C
     {
         (int A, (string [|B|], string C)) tuple = (0, (string.Empty, string.Empty));
     }
-}", new TestParameters(options: options.LocalNamesAreCamelCase));
+}", new TestParameters(options: s_options.LocalNamesAreCamelCase));
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.NamingStyle)]
@@ -801,7 +803,7 @@ class C
     {
         var tuple = ([|A|]: 0, B: 0);
     }
-}", new TestParameters(options: options.LocalNamesAreCamelCase));
+}", new TestParameters(options: s_options.LocalNamesAreCamelCase));
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.NamingStyle)]
@@ -816,7 +818,7 @@ class C
 {
     const int FIELD = 0;
 }",
-                options: options.ConstantsAreUpperCase);
+                options: s_options.ConstantsAreUpperCase);
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.NamingStyle)]
@@ -837,7 +839,7 @@ class C
         const int local1 = 0, LOCAL2 = 0;
     }
 }",
-                options: options.ConstantsAreUpperCase);
+                options: s_options.ConstantsAreUpperCase);
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.NamingStyle)]
@@ -847,7 +849,7 @@ class C
 @"class C
 {
     readonly int [|field|] = 0;
-}", new TestParameters(options: options.ConstantsAreUpperCase));
+}", new TestParameters(options: s_options.ConstantsAreUpperCase));
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.NamingStyle)]
@@ -860,7 +862,7 @@ class C
     {
         int local1 = 0, [|local2|] = 0;
     }
-}", new TestParameters(options: options.ConstantsAreUpperCase));
+}", new TestParameters(options: s_options.ConstantsAreUpperCase));
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.NamingStyle)]
@@ -881,7 +883,7 @@ class C
         const int PASCALCASE = 0;
     }
 }",
-                options: options.LocalsAreCamelCaseConstantsAreUpperCase);
+                options: s_options.LocalsAreCamelCaseConstantsAreUpperCase);
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.NamingStyle)]
@@ -902,7 +904,7 @@ class C
         int pascalCase = 0;
     }
 }",
-                options: options.LocalsAreCamelCaseConstantsAreUpperCase);
+                options: s_options.LocalsAreCamelCaseConstantsAreUpperCase);
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.NamingStyle)]
@@ -927,7 +929,7 @@ class C
         }
     }
 }",
-                options: options.LocalFunctionNamesAreCamelCase);
+                options: s_options.LocalFunctionNamesAreCamelCase);
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.NamingStyle)]
@@ -939,7 +941,7 @@ class C
     void [|M|]()
     {
     }
-}", new TestParameters(options: options.LocalFunctionNamesAreCamelCase));
+}", new TestParameters(options: s_options.LocalFunctionNamesAreCamelCase));
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.NamingStyle)]
@@ -958,7 +960,7 @@ class C
     {
     }
 }",
-                options: options.AsyncFunctionNamesEndWithAsync);
+                options: s_options.AsyncFunctionNamesEndWithAsync);
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.NamingStyle)]
@@ -983,7 +985,7 @@ class C
         }
     }
 }",
-                options: options.AsyncFunctionNamesEndWithAsync);
+                options: s_options.AsyncFunctionNamesEndWithAsync);
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.NamingStyle)]
@@ -998,7 +1000,7 @@ class C
         {
         }
     }
-}", new TestParameters(options: options.AsyncFunctionNamesEndWithAsync));
+}", new TestParameters(options: s_options.AsyncFunctionNamesEndWithAsync));
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.NamingStyle)]
@@ -1013,7 +1015,7 @@ class C
         {
         }
     }
-}", new TestParameters(options: options.AsyncFunctionNamesEndWithAsync));
+}", new TestParameters(options: s_options.AsyncFunctionNamesEndWithAsync));
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.NamingStyle)]
@@ -1038,7 +1040,7 @@ class C : I
 {
     public void M() { }
 }",
-                options: options.MethodNamesArePascalCase);
+                options: s_options.MethodNamesArePascalCase);
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.NamingStyle)]
@@ -1063,7 +1065,7 @@ class C : I
 {
     void I.M() { }
 }",
-                options: options.MethodNamesArePascalCase);
+                options: s_options.MethodNamesArePascalCase);
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.NamingStyle)]
@@ -1078,7 +1080,7 @@ class C : I
 class C : I
 {
     public void [|m|]() { }
-}", new TestParameters(options: options.MethodNamesArePascalCase));
+}", new TestParameters(options: s_options.MethodNamesArePascalCase));
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.NamingStyle)]
@@ -1093,7 +1095,7 @@ class C : I
 class C : I
 {
     void I.[|m|]() { }
-}", new TestParameters(options: options.MethodNamesArePascalCase));
+}", new TestParameters(options: s_options.MethodNamesArePascalCase));
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.NamingStyle)]
@@ -1120,7 +1122,7 @@ class D : C
 {
     public override void M() { }
 }",
-                options: options.MethodNamesArePascalCase);
+                options: s_options.MethodNamesArePascalCase);
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.NamingStyle)]
@@ -1136,7 +1138,7 @@ abstract class C
 class D : C
 {
     public override void [|m|]() { }
-}", new TestParameters(options: options.MethodNamesArePascalCase));
+}", new TestParameters(options: s_options.MethodNamesArePascalCase));
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.NamingStyle)]
@@ -1163,7 +1165,7 @@ class C : I
 {
     public int P { get { return 1; } set { } }
 }",
-                options: options.PropertyNamesArePascalCase);
+                options: s_options.PropertyNamesArePascalCase);
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.NamingStyle)]
@@ -1179,7 +1181,7 @@ interface I
 class C : I
 {
     public int [|p|] { get { return 1; } set { } }
-}", new TestParameters(options: options.PropertyNamesArePascalCase));
+}", new TestParameters(options: s_options.PropertyNamesArePascalCase));
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.NamingStyle)]
@@ -1195,7 +1197,7 @@ abstract class C
 class D : C
 {
     internal override void [|m|]() { }
-}", new TestParameters(options: options.MethodNamesArePascalCase));
+}", new TestParameters(options: s_options.MethodNamesArePascalCase));
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.NamingStyle)]
@@ -1208,7 +1210,7 @@ namespace Microsoft.CodeAnalysis.Host
 {
     internal interface 
 [|}|]
-", new TestParameters(options: options.InterfaceNamesStartWithI));
+", new TestParameters(options: s_options.InterfaceNamesStartWithI));
         }
 
 #if CODE_STYLE
@@ -1221,7 +1223,7 @@ namespace Microsoft.CodeAnalysis.Host
         public async Task TestRefactorNotify()
         {
             var markup = @"public class [|c|] { }";
-            var testParameters = new TestParameters(options: options.ClassNamesArePascalCase);
+            var testParameters = new TestParameters(options: s_options.ClassNamesArePascalCase);
 
             using var workspace = CreateWorkspaceFromOptions(markup, testParameters);
             var (_, action) = await GetCodeActionsAsync(workspace, testParameters);
@@ -1247,7 +1249,7 @@ namespace Microsoft.CodeAnalysis.Host
         public async Task TestRefactorNotifyInterfaceNamesStartWithI()
         {
             var markup = @"public interface [|test|] { }";
-            var testParameters = new TestParameters(options: options.InterfaceNamesStartWithI);
+            var testParameters = new TestParameters(options: s_options.InterfaceNamesStartWithI);
 
             using var workspace = CreateWorkspaceFromOptions(markup, testParameters);
             var (_, action) = await GetCodeActionsAsync(workspace, testParameters);
@@ -1276,7 +1278,7 @@ namespace Microsoft.CodeAnalysis.Host
 {
     void DoOtherThing<[|arg|]>() { }
 }";
-            var testParameters = new TestParameters(options: options.TypeParameterNamesStartWithT);
+            var testParameters = new TestParameters(options: s_options.TypeParameterNamesStartWithT);
 
             using var workspace = CreateWorkspaceFromOptions(markup, testParameters);
             var (_, action) = await GetCodeActionsAsync(workspace, testParameters);

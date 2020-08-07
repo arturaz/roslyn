@@ -12,6 +12,7 @@ using System.Threading.Tasks;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Editor.Shared.Utilities;
 using Microsoft.CodeAnalysis.ErrorReporting;
+using Microsoft.CodeAnalysis.Host.Mef;
 using Microsoft.CodeAnalysis.PooledObjects;
 using Microsoft.CodeAnalysis.ProjectTelemetry;
 using Microsoft.CodeAnalysis.Remote;
@@ -44,10 +45,10 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.ProjectTelemetr
         private readonly VisualStudioWorkspaceImpl _workspace;
 
         /// <summary>
-        /// Our connections to the remote OOP server. Created on demand when we startup and then
+        /// Our connection to the remote OOP server. Created on demand when we startup and then
         /// kept around for the lifetime of this service.
         /// </summary>
-        private KeepAliveSession? _keepAliveSession;
+        private RemoteServiceConnection? _connection;
 
         /// <summary>
         /// Queue where we enqueue the information we get from OOP to process in batch in the future.
@@ -55,6 +56,7 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.ProjectTelemetr
         private AsyncBatchingWorkQueue<ProjectTelemetryData>? _workQueue;
 
         [ImportingConstructor]
+        [Obsolete(MefConstruction.ImportingConstructorMessage, error: true)]
         public VisualStudioProjectTelemetryService(VisualStudioWorkspaceImpl workspace, IThreadingContext threadingContext) : base(threadingContext)
             => _workspace = workspace;
 
@@ -93,14 +95,12 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.ProjectTelemetr
 
             // Pass ourselves in as the callback target for the OOP service.  As it discovers
             // designer attributes it will call back into us to notify VS about it.
-            _keepAliveSession = await client.TryCreateKeepAliveSessionAsync(
-                WellKnownServiceHubServices.RemoteProjectTelemetryService,
+            _connection = await client.CreateConnectionAsync(
+                WellKnownServiceHubService.RemoteProjectTelemetryService,
                 callbackTarget: this, cancellationToken).ConfigureAwait(false);
-            if (_keepAliveSession == null)
-                return;
 
             // Now kick off scanning in the OOP process.
-            var success = await _keepAliveSession.TryInvokeAsync(
+            await _connection.RunRemoteAsync(
                 nameof(IRemoteProjectTelemetryService.ComputeProjectTelemetryAsync),
                 solution: null,
                 arguments: Array.Empty<object>(),

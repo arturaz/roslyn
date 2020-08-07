@@ -504,14 +504,12 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
         /// Gets corresponding primitive type code for this type declaration.
         /// </summary>
         internal Microsoft.Cci.PrimitiveTypeCode PrimitiveTypeCode
-        {
-            get
+            => TypeKind switch
             {
-                return this.IsPointerType()
-                    ? Microsoft.Cci.PrimitiveTypeCode.Pointer
-                    : SpecialTypes.GetTypeCode(SpecialType);
-            }
-        }
+                TypeKind.Pointer => Microsoft.Cci.PrimitiveTypeCode.Pointer,
+                TypeKind.FunctionPointer => Microsoft.Cci.PrimitiveTypeCode.FunctionPointer,
+                _ => SpecialTypes.GetTypeCode(SpecialType)
+            };
 
         #region Use-Site Diagnostics
 
@@ -557,6 +555,12 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
         public virtual bool IsTupleType => false;
 
         /// <summary>
+        /// True if the type represents a native integer. In C#, the types represented
+        /// by language keywords 'nint' and 'nuint'.
+        /// </summary>
+        internal virtual bool IsNativeIntegerType => false;
+
+        /// <summary>
         /// Verify if the given type is a tuple of a given cardinality, or can be used to back a tuple type 
         /// with the given cardinality. 
         /// </summary>
@@ -586,6 +590,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
         /// </summary>
         public virtual ImmutableArray<FieldSymbol> TupleElements => default(ImmutableArray<FieldSymbol>);
 
+#nullable enable
         /// <summary>
         /// Is this type a managed type (false for everything but enum, pointer, and
         /// some struct types).
@@ -593,13 +598,32 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
         /// <remarks>
         /// See Type::computeManagedType.
         /// </remarks>
-        internal bool IsManagedType => ManagedKind == ManagedKind.Managed;
+        internal bool IsManagedType(ref HashSet<DiagnosticInfo>? useSiteDiagnostics) => GetManagedKind(ref useSiteDiagnostics) == ManagedKind.Managed;
+
+        internal bool IsManagedTypeNoUseSiteDiagnostics
+        {
+            get
+            {
+                HashSet<DiagnosticInfo>? useSiteDiagnostics = null;
+                return IsManagedType(ref useSiteDiagnostics);
+            }
+        }
 
         /// <summary>
         /// Indicates whether a type is managed or not (i.e. you can take a pointer to it).
         /// Contains additional cases to help implement FeatureNotAvailable diagnostics.
         /// </summary>
-        internal abstract ManagedKind ManagedKind { get; }
+        internal abstract ManagedKind GetManagedKind(ref HashSet<DiagnosticInfo>? useSiteDiagnostics);
+
+        internal ManagedKind ManagedKindNoUseSiteDiagnostics
+        {
+            get
+            {
+                HashSet<DiagnosticInfo>? useSiteDiagnostics = null;
+                return GetManagedKind(ref useSiteDiagnostics);
+            }
+        }
+#nullable restore
 
         internal bool NeedsNullableAttribute()
         {
@@ -734,7 +758,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
                                                                                    out bool implementationInInterfacesMightChangeResult);
 
                     Debug.Assert(ignoreImplementationInInterfacesIfResultIsNotReady || !implementationInInterfacesMightChangeResult);
-                    Debug.Assert(!implementationInInterfacesMightChangeResult || result.Symbol is null); ;
+                    Debug.Assert(!implementationInInterfacesMightChangeResult || result.Symbol is null);
                     if (!implementationInInterfacesMightChangeResult)
                     {
                         map.TryAdd(interfaceMember, result);
@@ -1525,6 +1549,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
                     interfaceMethod.TypeParameters,
                     interfaceMethod.Parameters,
                     interfaceMethod.RefKind,
+                    interfaceMethod.IsInitOnly,
                     interfaceMethod.ReturnTypeWithAnnotations,
                     interfaceMethod.RefCustomModifiers,
                     interfaceMethod.ExplicitInterfaceImplementations);
@@ -1666,7 +1691,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
                 }
                 else
                 {
-                    ReportMismatchinReturnType<(TypeSymbol implementingType, bool isExplicit)> reportMismatchInReturnType =
+                    ReportMismatchInReturnType<(TypeSymbol implementingType, bool isExplicit)> reportMismatchInReturnType =
                         (diagnostics, implementedMethod, implementingMethod, topLevel, arg) =>
                         {
                             if (arg.isExplicit)
@@ -1787,6 +1812,10 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
                 ErrorCode errorCode = interfaceMember.IsAccessor() ? ErrorCode.ERR_UnimplementedInterfaceAccessor : ErrorCode.ERR_CloseUnimplementedInterfaceMemberNotPublic;
                 diagnostics.Add(errorCode, interfaceLocation, implementingType, interfaceMember, closestMismatch);
             }
+            else if (HaveInitOnlyMismatch(interfaceMember, closestMismatch))
+            {
+                diagnostics.Add(ErrorCode.ERR_CloseUnimplementedInterfaceMemberWrongInitOnly, interfaceLocation, implementingType, interfaceMember, closestMismatch);
+            }
             else //return ref kind or type doesn't match
             {
                 RefKind interfaceMemberRefKind = RefKind.None;
@@ -1838,6 +1867,21 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
                     diagnostics.Add(ErrorCode.ERR_CloseUnimplementedInterfaceMemberWrongReturnType, interfaceLocation, implementingType, interfaceMember, closestMismatch, interfaceMemberReturnType);
                 }
             }
+        }
+
+        internal static bool HaveInitOnlyMismatch(Symbol one, Symbol other)
+        {
+            if (!(one is MethodSymbol oneMethod))
+            {
+                return false;
+            }
+
+            if (!(other is MethodSymbol otherMethod))
+            {
+                return false;
+            }
+
+            return oneMethod.IsInitOnly != otherMethod.IsInitOnly;
         }
 
         /// <summary>
@@ -1999,6 +2043,10 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
         private static bool IsInterfaceMemberImplementation(Symbol candidateMember, Symbol interfaceMember, bool implementingTypeIsFromSomeCompilation)
         {
             if (candidateMember.DeclaredAccessibility != Accessibility.Public || candidateMember.IsStatic)
+            {
+                return false;
+            }
+            else if (HaveInitOnlyMismatch(candidateMember, interfaceMember))
             {
                 return false;
             }

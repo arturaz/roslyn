@@ -10,14 +10,12 @@ namespace Microsoft.VisualStudio.LanguageServices.LiveShare.Client
     internal static class HostLanguageServicesExtensions
     {
         public static TLanguageService GetOriginalLanguageService<TLanguageService>(this HostLanguageServices languageServices) where TLanguageService : class, ILanguageService
-        {
-            return languageServices.GetOriginalLanguageServices().GetService<TLanguageService>();
-        }
+            => languageServices.GetOriginalLanguageServices().GetService<TLanguageService>();
 
         public static HostLanguageServices GetOriginalLanguageServices(this HostLanguageServices languageServices)
         {
             var language = languageServices.Language;
-            var originalLanguage = language;
+            string originalLanguage;
 
             switch (language)
             {

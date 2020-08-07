@@ -274,7 +274,7 @@ namespace Microsoft.CodeAnalysis.CodeFixes.Configuration
 
             // Otherwise, add analyzer config document to all applicable projects for the current project's solution.
             AnalyzerConfigDocument? analyzerConfigDocument = null;
-            var analyzerConfigDirectory = PathUtilities.GetDirectoryName(analyzerConfigPath);
+            var analyzerConfigDirectory = PathUtilities.GetDirectoryName(analyzerConfigPath) ?? throw ExceptionUtilities.Unreachable;
             var currentSolution = _project.Solution;
             foreach (var projectId in _project.Solution.ProjectIds)
             {
@@ -353,7 +353,6 @@ namespace Microsoft.CodeAnalysis.CodeFixes.Configuration
             parts = default;
             return false;
         }
-
 
         internal static ImmutableArray<(OptionKey optionKey, ICodeStyleOption codeStyleOptionValue, IEditorConfigStorageLocation2 location, bool isPerLanguage)> GetCodeStyleOptionsForDiagnostic(
             Diagnostic diagnostic,
@@ -489,10 +488,13 @@ namespace Microsoft.CodeAnalysis.CodeFixes.Configuration
                                         key.EndsWith(SeveritySuffix, StringComparison.Ordinal))
                                     {
                                         var diagIdLength = key.Length - (DiagnosticOptionPrefix.Length + SeveritySuffix.Length);
-                                        var diagId = key.Substring(DiagnosticOptionPrefix.Length, diagIdLength);
-                                        if (string.Equals(diagId, _diagnostic.Id, StringComparison.OrdinalIgnoreCase))
+                                        if (diagIdLength > 0)
                                         {
-                                            textChange = new TextChange(curLine.Span, $"{key} = {_newSeverity}{commentValue}");
+                                            var diagId = key.Substring(DiagnosticOptionPrefix.Length, diagIdLength);
+                                            if (string.Equals(diagId, _diagnostic.Id, StringComparison.OrdinalIgnoreCase))
+                                            {
+                                                textChange = new TextChange(curLine.Span, $"{key} = {_newSeverity}{commentValue}");
+                                            }
                                         }
                                     }
 

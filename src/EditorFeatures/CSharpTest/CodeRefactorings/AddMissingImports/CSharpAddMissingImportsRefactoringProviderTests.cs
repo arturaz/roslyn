@@ -8,6 +8,7 @@ using Microsoft.CodeAnalysis.CodeRefactorings;
 using Microsoft.CodeAnalysis.CSharp.CodeRefactorings.AddMissingImports;
 using Microsoft.CodeAnalysis.Editing;
 using Microsoft.CodeAnalysis.Editor.CSharp.UnitTests.CodeRefactorings;
+using Microsoft.CodeAnalysis.Editor.UnitTests.CodeActions;
 using Microsoft.CodeAnalysis.Editor.UnitTests.Workspaces;
 using Microsoft.CodeAnalysis.PasteTracking;
 using Microsoft.CodeAnalysis.Test.Utilities;
@@ -27,10 +28,8 @@ namespace Microsoft.CodeAnalysis.AddMissingImports
             return new CSharpAddMissingImportsRefactoringProvider(pasteTrackingService);
         }
 
-        protected override TestWorkspace CreateWorkspaceFromFile(string initialMarkup, TestParameters parameters)
+        protected override void InitializeWorkspace(TestWorkspace workspace, TestParameters parameters)
         {
-            var workspace = TestWorkspace.CreateCSharp(initialMarkup);
-
             // Treat the span being tested as the pasted span
             var hostDocument = workspace.Documents.First();
             var pastedTextSpan = hostDocument.SelectedSpans.FirstOrDefault();
@@ -44,17 +43,18 @@ namespace Microsoft.CodeAnalysis.AddMissingImports
                 pasteTrackingService.RegisterPastedTextSpan(hostDocument.GetTextBuffer(), default);
                 pasteTrackingService.RegisterPastedTextSpan(hostDocument.GetTextBuffer(), pastedTextSpan);
             }
-
-            return workspace;
         }
 
         private Task TestInRegularAndScriptAsync(
             string initialMarkup, string expectedMarkup,
             bool placeSystemNamespaceFirst, bool separateImportDirectiveGroups)
         {
-            var options = OptionsSet(
-                SingleOption(GenerationOptions.PlaceSystemNamespaceFirst, placeSystemNamespaceFirst),
-                SingleOption(GenerationOptions.SeparateImportDirectiveGroups, separateImportDirectiveGroups));
+            var options =
+                new OptionsCollection(GetLanguage())
+                {
+                    { GenerationOptions.PlaceSystemNamespaceFirst, placeSystemNamespaceFirst },
+                    { GenerationOptions.SeparateImportDirectiveGroups, separateImportDirectiveGroups },
+                };
             return TestInRegularAndScriptAsync(initialMarkup, expectedMarkup, options: options);
         }
 

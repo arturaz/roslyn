@@ -2,12 +2,15 @@
 // The .NET Foundation licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
+#nullable enable
+
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Formatting.Rules;
+using Microsoft.CodeAnalysis.LanguageServices;
 using Microsoft.CodeAnalysis.Shared.Extensions;
 using Microsoft.CodeAnalysis.Shared.Utilities;
 using Microsoft.CodeAnalysis.Text;
@@ -17,16 +20,18 @@ namespace Microsoft.CodeAnalysis.Formatting
 {
     internal class BottomUpBaseIndentationFinder
     {
-        private readonly TokenStream _tokenStream;
+        private readonly TokenStream? _tokenStream;
         private readonly ChainedFormattingRules _formattingRules;
         private readonly int _tabSize;
         private readonly int _indentationSize;
+        private readonly ISyntaxFacts _syntaxFacts;
 
         public BottomUpBaseIndentationFinder(
             ChainedFormattingRules formattingRules,
             int tabSize,
             int indentationSize,
-            TokenStream tokenStream)
+            TokenStream? tokenStream,
+            ISyntaxFacts syntaxFacts)
         {
             Contract.ThrowIfNull(formattingRules);
 
@@ -34,6 +39,7 @@ namespace Microsoft.CodeAnalysis.Formatting
             _tabSize = tabSize;
             _indentationSize = indentationSize;
             _tokenStream = tokenStream;
+            _syntaxFacts = syntaxFacts;
         }
 
         public int? FromIndentBlockOperations(
@@ -96,7 +102,7 @@ namespace Microsoft.CodeAnalysis.Formatting
 
             return GetIndentationOfCurrentPosition(
                 tree.GetRoot(cancellationToken),
-                token, list, position, extraSpaces,
+                list, position, extraSpaces,
                 t => tree.GetTokenColumn(t, _tabSize),
                 cancellationToken);
         }
@@ -125,19 +131,18 @@ namespace Microsoft.CodeAnalysis.Formatting
                 }
             }
 
-            return GetIndentationOfCurrentPosition(root, token, list, token.SpanStart, /* extraSpaces */ 0, tokenColumnGetter, cancellationToken);
+            return GetIndentationOfCurrentPosition(root, list, token.SpanStart, /* extraSpaces */ 0, tokenColumnGetter, cancellationToken);
         }
 
         private int GetIndentationOfCurrentPosition(
             SyntaxNode root,
-            SyntaxToken token,
             List<IndentBlockOperation> list,
             int position,
             int extraSpaces,
             Func<SyntaxToken, int> tokenColumnGetter,
             CancellationToken cancellationToken)
         {
-            var tuple = GetIndentationRuleOfCurrentPosition(root, token, list, position);
+            var tuple = GetIndentationRuleOfCurrentPosition(root, list, position);
             var indentationLevel = tuple.indentation;
             var operation = tuple.operation;
 
@@ -149,6 +154,7 @@ namespace Microsoft.CodeAnalysis.Formatting
             if (operation.IsRelativeIndentation)
             {
                 var baseToken = operation.BaseToken;
+                RoslynDebug.AssertNotNull(baseToken.SyntaxTree);
 
                 // If the SmartIndenter created this IndentationFinder then tokenStream will be a null hence we should do a null check on the tokenStream
                 if (operation.Option.IsOn(IndentBlockOption.RelativeToFirstTokenOnBaseTokenLine))
@@ -165,7 +171,8 @@ namespace Microsoft.CodeAnalysis.Formatting
                 }
 
                 var baseIndentation = tokenColumnGetter(baseToken);
-                return Math.Max(0, baseIndentation + (indentationLevel + operation.IndentationDeltaOrPosition) * _indentationSize);
+                var delta = operation.GetAdjustedIndentationDelta(_syntaxFacts, root, baseToken);
+                return Math.Max(0, baseIndentation + (indentationLevel + delta) * _indentationSize);
             }
 
             if (operation.Option.IsOn(IndentBlockOption.AbsolutePosition))
@@ -176,8 +183,8 @@ namespace Microsoft.CodeAnalysis.Formatting
             throw ExceptionUtilities.Unreachable;
         }
 
-        private (int indentation, IndentBlockOperation operation) GetIndentationRuleOfCurrentPosition(
-            SyntaxNode root, SyntaxToken token, List<IndentBlockOperation> list, int position)
+        private (int indentation, IndentBlockOperation? operation) GetIndentationRuleOfCurrentPosition(
+            SyntaxNode root, List<IndentBlockOperation> list, int position)
         {
             var indentationLevel = 0;
             var operations = GetIndentBlockOperationsFromSmallestSpan(root, list, position);
@@ -221,7 +228,7 @@ namespace Microsoft.CodeAnalysis.Formatting
         }
 
         // Get parent nodes, including walking out of structured trivia.
-        private IEnumerable<SyntaxNode> GetParentNodes(SyntaxToken token)
+        private static IEnumerable<SyntaxNode> GetParentNodes(SyntaxToken token)
         {
             var current = token.Parent;
 
@@ -270,7 +277,7 @@ namespace Microsoft.CodeAnalysis.Formatting
             return default;
         }
 
-        private IndentBlockOperation GetIndentationDataFor(SyntaxNode root, SyntaxToken token, int position)
+        private IndentBlockOperation? GetIndentationDataFor(SyntaxNode root, SyntaxToken token, int position)
         {
             var startNode = token.Parent;
 

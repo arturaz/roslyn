@@ -9,6 +9,7 @@ using System.ComponentModel.Composition;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.Host.Mef;
 using Microsoft.VisualStudio.LanguageServer.Protocol;
 using Microsoft.VisualStudio.LanguageServices.LiveShare.CustomProtocol;
 using Microsoft.VisualStudio.LiveShare.LanguageServices;
@@ -21,8 +22,7 @@ namespace Microsoft.VisualStudio.LanguageServices.LiveShare.Shims
         {
             Capabilities = new ServerCapabilities
             {
-                CodeActionProvider = true,
-                ExecuteCommandProvider = new ExecuteCommandOptions(),
+                CodeActionProvider = false,
                 ReferencesProvider = true,
                 RenameProvider = false,
                 Experimental = new RoslynExperimentalCapabilities { SyntacticLspProvider = true },
@@ -38,6 +38,7 @@ namespace Microsoft.VisualStudio.LanguageServices.LiveShare.Shims
     internal class RoslynInitializeHandlerShim : LiveShareInitializeHandler
     {
         [ImportingConstructor]
+        [Obsolete(MefConstruction.ImportingConstructorMessage, error: true)]
         public RoslynInitializeHandlerShim()
         {
         }
@@ -47,6 +48,7 @@ namespace Microsoft.VisualStudio.LanguageServices.LiveShare.Shims
     internal class CSharpInitializeHandlerShim : LiveShareInitializeHandler
     {
         [ImportingConstructor]
+        [Obsolete(MefConstruction.ImportingConstructorMessage, error: true)]
         public CSharpInitializeHandlerShim()
         {
         }
@@ -56,6 +58,7 @@ namespace Microsoft.VisualStudio.LanguageServices.LiveShare.Shims
     internal class VisualBasicInitializeHandlerShim : LiveShareInitializeHandler
     {
         [ImportingConstructor]
+        [Obsolete(MefConstruction.ImportingConstructorMessage, error: true)]
         public VisualBasicInitializeHandlerShim()
         {
         }

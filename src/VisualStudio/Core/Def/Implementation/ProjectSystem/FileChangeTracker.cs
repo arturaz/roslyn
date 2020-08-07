@@ -18,7 +18,7 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.ProjectSystem
     {
         private const _VSFILECHANGEFLAGS DefaultFileChangeFlags = _VSFILECHANGEFLAGS.VSFILECHG_Time | _VSFILECHANGEFLAGS.VSFILECHG_Add | _VSFILECHANGEFLAGS.VSFILECHG_Del | _VSFILECHANGEFLAGS.VSFILECHG_Size;
 
-        private static readonly AsyncLazy<uint?> s_none = new AsyncLazy<uint?>(ct => null, cacheResult: true);
+        private static readonly AsyncLazy<uint?> s_none = new AsyncLazy<uint?>(value: null);
 
         private readonly IVsFileChangeEx _fileChangeService;
         private readonly string _filePath;
@@ -93,7 +93,7 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.ProjectSystem
         public void EnsureSubscription()
         {
             // make sure we have file notification subscribed
-            var unused = _fileChangeCookie.GetValue(CancellationToken.None);
+            _ = _fileChangeCookie.GetValue(CancellationToken.None);
         }
 
         public Task StartFileChangeListeningAsync()
@@ -191,9 +191,7 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.ProjectSystem
         }
 
         int IVsFileChangeEvents.DirectoryChanged(string directory)
-        {
-            throw new Exception("We only watch files; we should never be seeing directory changes!");
-        }
+            => throw new Exception("We only watch files; we should never be seeing directory changes!");
 
         int IVsFileChangeEvents.FilesChanged(uint changeCount, string[] files, uint[] changes)
         {
@@ -210,19 +208,13 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.ProjectSystem
         }
 
         int IVsFreeThreadedFileChangeEvents2.DirectoryChanged(string pszDirectory)
-        {
-            throw new Exception("We only watch files; we should never be seeing directory changes!");
-        }
+            => throw new Exception("We only watch files; we should never be seeing directory changes!");
 
         int IVsFreeThreadedFileChangeEvents2.DirectoryChangedEx(string pszDirectory, string pszFile)
-        {
-            throw new Exception("We only watch files; we should never be seeing directory changes!");
-        }
+            => throw new Exception("We only watch files; we should never be seeing directory changes!");
 
         int IVsFreeThreadedFileChangeEvents2.DirectoryChangedEx2(string pszDirectory, uint cChanges, string[] rgpszFile, uint[] rggrfChange)
-        {
-            throw new Exception("We only watch files; we should never be seeing directory changes!");
-        }
+            => throw new Exception("We only watch files; we should never be seeing directory changes!");
 
         int IVsFreeThreadedFileChangeEvents.FilesChanged(uint cChanges, string[] rgpszFile, uint[] rggrfChange)
         {
@@ -232,13 +224,9 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.ProjectSystem
         }
 
         int IVsFreeThreadedFileChangeEvents.DirectoryChanged(string pszDirectory)
-        {
-            throw new Exception("We only watch files; we should never be seeing directory changes!");
-        }
+            => throw new Exception("We only watch files; we should never be seeing directory changes!");
 
         int IVsFreeThreadedFileChangeEvents.DirectoryChangedEx(string pszDirectory, string pszFile)
-        {
-            throw new Exception("We only watch files; we should never be seeing directory changes!");
-        }
+            => throw new Exception("We only watch files; we should never be seeing directory changes!");
     }
 }

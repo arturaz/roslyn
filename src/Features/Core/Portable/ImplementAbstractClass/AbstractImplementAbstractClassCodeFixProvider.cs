@@ -8,7 +8,6 @@ using System;
 using System.Collections.Immutable;
 using System.Threading;
 using System.Threading.Tasks;
-using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CodeActions;
 using Microsoft.CodeAnalysis.CodeFixes;
 using Microsoft.CodeAnalysis.Shared.Extensions;
@@ -61,7 +60,7 @@ namespace Microsoft.CodeAnalysis.ImplementAbstractClass
                 id = GetCodeActionId(
                     abstractClassType.ContainingAssembly.Name,
                     abstractClassType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat),
-                    through.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat));
+                    through.Name);
                 context.RegisterCodeFix(
                     new MyCodeAction(
                         string.Format(FeaturesResources.Implement_through_0, through.Name),

@@ -28,8 +28,8 @@ Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.Completion.Complet
                 .WithChangedOption(CompletionServiceOptions.IsExpandedCompletion, IsExpandedCompletion)
         End Function
 
-        Protected Overrides Function GetExportCatalog() As ComposableCatalog
-            Return MyBase.GetExportCatalog().WithPart(GetType(TestExperimentationService))
+        Protected Overrides Function GetComposition() As TestComposition
+            Return MyBase.GetComposition().AddParts(GetType(TestExperimentationService))
         End Function
 
         Friend Overrides Function GetCompletionProviderType() As Type
@@ -144,7 +144,7 @@ Public Class Bar
     End Sub
 End Class]]></Text>.Value
 
-            Dim markup = CreateMarkupForProjecWithProjectReference(file2, file1, LanguageNames.VisualBasic, LanguageNames.CSharp)
+            Dim markup = CreateMarkupForProjectWithProjectReference(file2, file1, LanguageNames.VisualBasic, LanguageNames.CSharp)
             Await VerifyItemExistsAsync(markup, "My", glyph:=Glyph.ClassPublic, inlineDescription:="Foo", expectedDescriptionOrNull:="Class Foo.Myattribute")
             Await VerifyItemIsAbsentAsync(markup, "Myattribute", inlineDescription:="Foo")
         End Function

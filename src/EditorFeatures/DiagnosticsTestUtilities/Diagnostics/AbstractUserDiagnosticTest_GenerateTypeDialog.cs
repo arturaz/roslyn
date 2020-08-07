@@ -10,7 +10,9 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.CodeAnalysis.Editor.UnitTests.CodeActions;
 using Microsoft.CodeAnalysis.Editor.UnitTests.Diagnostics.GenerateType;
+using Microsoft.CodeAnalysis.Editor.UnitTests.Workspaces;
 using Microsoft.CodeAnalysis.GenerateType;
+using Microsoft.CodeAnalysis.Test.Utilities;
 using Microsoft.CodeAnalysis.Text;
 using Microsoft.CodeAnalysis.UnitTests;
 using Roslyn.Utilities;
@@ -20,6 +22,11 @@ namespace Microsoft.CodeAnalysis.Editor.UnitTests.Diagnostics
 {
     public abstract partial class AbstractUserDiagnosticTest : AbstractCodeActionOrUserDiagnosticTest
     {
+        // TODO: IInlineRenameService requires WPF (https://github.com/dotnet/roslyn/issues/46153)
+        private static readonly TestComposition s_composition = EditorTestCompositions.EditorFeaturesWpf.AddParts(
+            typeof(TestGenerateTypeOptionsService),
+            typeof(TestProjectManagementService));
+
         internal async Task TestWithMockedGenerateTypeDialog(
             string initial,
             string languageName,
@@ -45,7 +52,16 @@ namespace Microsoft.CodeAnalysis.Editor.UnitTests.Diagnostics
             IList<TypeKindOptions> assertTypeKindAbsent = null,
             bool isCancelled = false)
         {
-            using var testState = GenerateTypeTestState.Create(initial, projectName, typeName, existingFilename, languageName);
+            var workspace = TestWorkspace.IsWorkspaceElement(initial)
+                ? TestWorkspace.Create(initial, composition: s_composition)
+                : languageName == LanguageNames.CSharp
+                  ? TestWorkspace.CreateCSharp(initial, composition: s_composition)
+                  : TestWorkspace.CreateVisualBasic(initial, composition: s_composition);
+
+            var testOptions = new TestParameters();
+            var (diagnostics, actions, _) = await GetDiagnosticAndFixesAsync(workspace, testOptions);
+
+            using var testState = new GenerateTypeTestState(workspace, projectToBeModified: projectName, typeName, existingFilename);
 
             // Initialize the viewModel values
             testState.TestGenerateTypeOptionsService.SetGenerateTypeOptions(
@@ -64,8 +80,6 @@ namespace Microsoft.CodeAnalysis.Editor.UnitTests.Diagnostics
             testState.TestProjectManagementService.SetDefaultNamespace(
                 defaultNamespace: defaultNamespace);
 
-            var testOptions = new TestParameters();
-            var (diagnostics, actions, _) = await GetDiagnosticAndFixesAsync(testState.Workspace, testOptions);
             var generateTypeDiagFixes = diagnostics.SingleOrDefault(df => GenerateTypeTestState.FixIds.Contains(df.Id));
 
             if (isMissing)

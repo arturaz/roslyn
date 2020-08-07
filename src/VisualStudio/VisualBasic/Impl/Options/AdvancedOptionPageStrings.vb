@@ -35,6 +35,12 @@ Namespace Microsoft.VisualStudio.LanguageServices.VisualBasic.Options
             End Get
         End Property
 
+        Public ReadOnly Property Option_Display_inline_parameter_name_hints As String
+            Get
+                Return ServicesVSResources.Display_inline_parameter_name_hints
+            End Get
+        End Property
+
         Public ReadOnly Property Option_DontPutOutOrRefOnStruct As String
             Get
                 Return BasicVSResources.Don_t_put_ByRef_on_custom_structure
@@ -107,6 +113,12 @@ Namespace Microsoft.VisualStudio.LanguageServices.VisualBasic.Options
         Public ReadOnly Property Option_GenerateXmlDocCommentsForTripleApostrophes As String
             Get
                 Return BasicVSResources.Generate_XML_documentation_comments_for
+            End Get
+        End Property
+
+        Public ReadOnly Property Option_ShowRemarksInQuickInfo As String
+            Get
+                Return BasicVSResources.Show_remarks_in_Quick_Info
             End Get
         End Property
 

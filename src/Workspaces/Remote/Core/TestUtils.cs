@@ -3,15 +3,18 @@
 // See the LICENSE file in the project root for more information.
 
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Linq;
-using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
-using Microsoft.CodeAnalysis.Internal.Log;
 using Microsoft.CodeAnalysis.Serialization;
 
-namespace Microsoft.CodeAnalysis.Remote.DebugUtil
+#if DEBUG
+using System.Diagnostics;
+using System.Text;
+using Microsoft.CodeAnalysis.Internal.Log;
+#endif
+
+namespace Microsoft.CodeAnalysis.Remote
 {
     internal static class TestUtils
     {

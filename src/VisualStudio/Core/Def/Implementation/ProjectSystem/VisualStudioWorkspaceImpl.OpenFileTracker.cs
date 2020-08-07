@@ -110,7 +110,7 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.ProjectSystem
             {
             }
 
-            public async static Task<OpenFileTracker> CreateAsync(VisualStudioWorkspaceImpl workspace, IAsyncServiceProvider asyncServiceProvider)
+            public static async Task<OpenFileTracker> CreateAsync(VisualStudioWorkspaceImpl workspace, IAsyncServiceProvider asyncServiceProvider)
             {
                 var runningDocumentTable = (IVsRunningDocumentTable)await asyncServiceProvider.GetServiceAsync(typeof(SVsRunningDocumentTable)).ConfigureAwait(true);
                 var componentModel = (IComponentModel)await asyncServiceProvider.GetServiceAsync(typeof(SComponentModel)).ConfigureAwait(true);
@@ -118,7 +118,7 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.ProjectSystem
                 return new OpenFileTracker(workspace, runningDocumentTable, componentModel);
             }
 
-            private void TryOpeningDocumentsForMoniker(string moniker, ITextBuffer textBuffer, IVsHierarchy hierarchy)
+            private void TryOpeningDocumentsForMoniker(string moniker, ITextBuffer textBuffer, IVsHierarchy? hierarchy)
             {
                 _foregroundAffinitization.AssertIsForeground();
 
@@ -171,7 +171,7 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.ProjectSystem
                 });
             }
 
-            private ProjectId GetActiveContextProjectIdAndWatchHierarchies(string moniker, IEnumerable<ProjectId> projectIds, IVsHierarchy hierarchy)
+            private ProjectId GetActiveContextProjectIdAndWatchHierarchies(string moniker, IEnumerable<ProjectId> projectIds, IVsHierarchy? hierarchy)
             {
                 _foregroundAffinitization.AssertIsForeground();
 
@@ -335,7 +335,7 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.ProjectSystem
             /// </summary>
             public void QueueCheckForFilesBeingOpen(ImmutableArray<string> newFileNames)
             {
-                _foregroundAffinitization.ThisCanBeCalledOnAnyThread();
+                ForegroundThreadAffinitizedObject.ThisCanBeCalledOnAnyThread();
 
                 var shouldStartTask = false;
 
@@ -439,24 +439,16 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.ProjectSystem
                 }
 
                 void IDisposable.Dispose()
-                {
-                    _hierarchy.UnadviseHierarchyEvents(_cookie);
-                }
+                    => _hierarchy.UnadviseHierarchyEvents(_cookie);
 
                 int IVsHierarchyEvents.OnItemAdded(uint itemidParent, uint itemidSiblingPrev, uint itemidAdded)
-                {
-                    return VSConstants.E_NOTIMPL;
-                }
+                    => VSConstants.E_NOTIMPL;
 
                 int IVsHierarchyEvents.OnItemsAppended(uint itemidParent)
-                {
-                    return VSConstants.E_NOTIMPL;
-                }
+                    => VSConstants.E_NOTIMPL;
 
                 int IVsHierarchyEvents.OnItemDeleted(uint itemid)
-                {
-                    return VSConstants.E_NOTIMPL;
-                }
+                    => VSConstants.E_NOTIMPL;
 
                 int IVsHierarchyEvents.OnPropertyChanged(uint itemid, int propid, uint flags)
                 {
@@ -470,14 +462,10 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.ProjectSystem
                 }
 
                 int IVsHierarchyEvents.OnInvalidateItems(uint itemidParent)
-                {
-                    return VSConstants.E_NOTIMPL;
-                }
+                    => VSConstants.E_NOTIMPL;
 
                 int IVsHierarchyEvents.OnInvalidateIcon(IntPtr hicon)
-                {
-                    return VSConstants.E_NOTIMPL;
-                }
+                    => VSConstants.E_NOTIMPL;
             }
         }
     }

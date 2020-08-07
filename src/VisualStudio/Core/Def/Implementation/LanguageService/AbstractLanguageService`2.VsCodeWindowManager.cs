@@ -97,13 +97,7 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.LanguageService
             }
 
             private void SetupView(IVsTextView view)
-            {
-                _languageService.SetupNewTextView(view);
-            }
-
-            private void TeardownView(IVsTextView view)
-            {
-            }
+                => _languageService.SetupNewTextView(view);
 
             private void OnOptionChanged(object sender, OptionChangedEventArgs e)
             {
@@ -271,8 +265,6 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.LanguageService
 
             public int OnCloseView(IVsTextView view)
             {
-                TeardownView(view);
-
                 return VSConstants.S_OK;
             }
 

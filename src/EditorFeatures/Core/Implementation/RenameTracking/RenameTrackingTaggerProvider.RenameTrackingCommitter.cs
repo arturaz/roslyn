@@ -64,9 +64,7 @@ namespace Microsoft.CodeAnalysis.Editor.Implementation.RenameTracking
             }
 
             public async Task<RenameTrackingSolutionSet> RenameSymbolAsync(CancellationToken cancellationToken)
-            {
-                return await _renameSymbolResultGetter.GetValueAsync(cancellationToken).ConfigureAwait(false);
-            }
+                => await _renameSymbolResultGetter.GetValueAsync(cancellationToken).ConfigureAwait(false);
 
             private async Task<RenameTrackingSolutionSet> RenameSymbolWorkerAsync(CancellationToken cancellationToken)
             {
@@ -165,7 +163,6 @@ namespace Microsoft.CodeAnalysis.Editor.Implementation.RenameTracking
                 UpdateWorkspaceForGlobalIdentifierRename(
                     workspace,
                     finalSolution,
-                    workspace.CurrentSolution,
                     _displayText,
                     changedDocuments,
                     renameTrackingSolutionSet.Symbol,
@@ -243,7 +240,6 @@ namespace Microsoft.CodeAnalysis.Editor.Implementation.RenameTracking
             private void UpdateWorkspaceForGlobalIdentifierRename(
                 Workspace workspace,
                 Solution newSolution,
-                Solution oldSolution,
                 string undoName,
                 IEnumerable<DocumentId> changedDocuments,
                 ISymbol symbol,

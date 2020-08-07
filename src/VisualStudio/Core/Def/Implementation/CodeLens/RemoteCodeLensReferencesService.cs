@@ -4,6 +4,7 @@
 
 using System.Collections.Generic;
 using System.Composition;
+using System.Diagnostics.CodeAnalysis;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.CodeAnalysis;
@@ -13,7 +14,6 @@ using Microsoft.CodeAnalysis.Host.Mef;
 using Microsoft.CodeAnalysis.Internal.Log;
 using Microsoft.CodeAnalysis.Remote;
 using Microsoft.CodeAnalysis.Text;
-using Microsoft.VisualStudio.LanguageServer.Client;
 using Roslyn.Utilities;
 
 namespace Microsoft.VisualStudio.LanguageServices.CodeLens
@@ -22,6 +22,7 @@ namespace Microsoft.VisualStudio.LanguageServices.CodeLens
     internal sealed class RemoteCodeLensReferencesService : ICodeLensReferencesService
     {
         [ImportingConstructor]
+        [SuppressMessage("RoslynDiagnosticsReliability", "RS0033:Importing constructor should be [Obsolete]", Justification = "Used in test code: https://github.com/dotnet/roslyn/issues/42814")]
         public RemoteCodeLensReferencesService()
         {
         }
@@ -39,18 +40,13 @@ namespace Microsoft.VisualStudio.LanguageServices.CodeLens
                 var client = await RemoteHostClient.TryGetClientAsync(solution.Workspace, cancellationToken).ConfigureAwait(false);
                 if (client != null)
                 {
-                    var result = await client.TryRunRemoteAsync<ReferenceCount>(
-                        WellKnownServiceHubServices.CodeAnalysisService,
+                    return await client.RunRemoteAsync<ReferenceCount>(
+                        WellKnownServiceHubService.CodeAnalysis,
                         nameof(IRemoteCodeLensReferencesService.GetReferenceCountAsync),
                         solution,
                         new object[] { documentId, syntaxNode.Span, maxSearchResults },
                         callbackTarget: null,
                         cancellationToken).ConfigureAwait(false);
-
-                    if (result.HasValue)
-                    {
-                        return result.Value;
-                    }
                 }
 
                 return await CodeLensReferencesServiceFactory.Instance.GetReferenceCountAsync(solution, documentId, syntaxNode, maxSearchResults, cancellationToken).ConfigureAwait(false);
@@ -86,18 +82,13 @@ namespace Microsoft.VisualStudio.LanguageServices.CodeLens
                 var client = await RemoteHostClient.TryGetClientAsync(solution.Workspace, cancellationToken).ConfigureAwait(false);
                 if (client != null)
                 {
-                    var result = await client.TryRunRemoteAsync<IEnumerable<ReferenceMethodDescriptor>>(
-                        WellKnownServiceHubServices.CodeAnalysisService,
+                    return await client.RunRemoteAsync<IEnumerable<ReferenceMethodDescriptor>>(
+                        WellKnownServiceHubService.CodeAnalysis,
                         nameof(IRemoteCodeLensReferencesService.FindReferenceMethodsAsync),
                         solution,
                         new object[] { documentId, syntaxNode.Span },
                         callbackTarget: null,
                         cancellationToken).ConfigureAwait(false);
-
-                    if (result.HasValue)
-                    {
-                        return result.Value;
-                    }
                 }
 
                 return await CodeLensReferencesServiceFactory.Instance.FindReferenceMethodsAsync(solution, documentId, syntaxNode, cancellationToken).ConfigureAwait(false);
@@ -117,18 +108,13 @@ namespace Microsoft.VisualStudio.LanguageServices.CodeLens
                 var client = await RemoteHostClient.TryGetClientAsync(solution.Workspace, cancellationToken).ConfigureAwait(false);
                 if (client != null)
                 {
-                    var result = await client.TryRunRemoteAsync<string>(
-                        WellKnownServiceHubServices.CodeAnalysisService,
+                    return await client.RunRemoteAsync<string>(
+                        WellKnownServiceHubService.CodeAnalysis,
                         nameof(IRemoteCodeLensReferencesService.GetFullyQualifiedNameAsync),
                         solution,
                         new object[] { documentId, syntaxNode.Span },
                         callbackTarget: null,
                         cancellationToken).ConfigureAwait(false);
-
-                    if (result.HasValue)
-                    {
-                        return result.Value;
-                    }
                 }
 
                 return await CodeLensReferencesServiceFactory.Instance.GetFullyQualifiedNameAsync(solution, documentId, syntaxNode, cancellationToken).ConfigureAwait(false);
@@ -251,18 +237,13 @@ namespace Microsoft.VisualStudio.LanguageServices.CodeLens
             var client = await RemoteHostClient.TryGetClientAsync(solution.Workspace, cancellationToken).ConfigureAwait(false);
             if (client != null)
             {
-                var result = await client.TryRunRemoteAsync<IEnumerable<ReferenceLocationDescriptor>>(
-                    WellKnownServiceHubServices.CodeAnalysisService,
+                return await client.RunRemoteAsync<IEnumerable<ReferenceLocationDescriptor>>(
+                    WellKnownServiceHubService.CodeAnalysis,
                     nameof(IRemoteCodeLensReferencesService.FindReferenceLocationsAsync),
                     solution,
                     new object[] { documentId, syntaxNode.Span },
                     callbackTarget: null,
                     cancellationToken).ConfigureAwait(false);
-
-                if (result.HasValue)
-                {
-                    return result.Value;
-                }
             }
 
             // remote host is not running. this can happen if remote host is disabled.

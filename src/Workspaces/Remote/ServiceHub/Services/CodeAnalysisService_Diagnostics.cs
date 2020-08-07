@@ -4,16 +4,11 @@
 
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.CodeAnalysis.Diagnostics;
-using Microsoft.CodeAnalysis.Execution;
 using Microsoft.CodeAnalysis.Internal.Log;
 using Microsoft.CodeAnalysis.Remote.Diagnostics;
-using Microsoft.CodeAnalysis.Serialization;
-using Microsoft.CodeAnalysis.Workspaces.Diagnostics;
-using Roslyn.Utilities;
 using RoslynLogger = Microsoft.CodeAnalysis.Internal.Log.Logger;
 
 namespace Microsoft.CodeAnalysis.Remote
@@ -30,22 +25,29 @@ namespace Microsoft.CodeAnalysis.Remote
         {
             return RunServiceAsync(async () =>
             {
-                // if this analysis is explicitly asked by user, boost priority of this request
                 using (RoslynLogger.LogBlock(FunctionId.CodeAnalysisService_CalculateDiagnosticsAsync, arguments.ProjectId.DebugName, cancellationToken))
-                using (arguments.ForcedAnalysis ? UserOperationBooster.Boost() : default)
+                using (arguments.IsHighPriority ? UserOperationBooster.Boost() : default)
                 {
                     var solutionService = CreateSolutionService(solutionInfo);
                     var solution = await solutionService.GetSolutionAsync(solutionInfo, cancellationToken).ConfigureAwait(false);
 
+                    var documentId = arguments.DocumentId;
                     var projectId = arguments.ProjectId;
-                    var analyzers = solutionService.AssetProvider.GetGlobalAssetsOfType<AnalyzerReference>(cancellationToken);
+                    var project = solution.GetProject(projectId);
+                    var documentSpan = arguments.DocumentSpan;
+                    var documentAnalysisKind = arguments.DocumentAnalysisKind;
+                    var diagnosticComputer = new DiagnosticComputer(documentId, project, documentSpan, documentAnalysisKind, _analyzerInfoCache);
 
-                    var result = await new DiagnosticComputer(solution.GetProject(projectId), _analyzerInfoCache).GetDiagnosticsAsync(
-                        analyzers, arguments.AnalyzerIds, arguments.ReportSuppressedDiagnostics, arguments.LogAnalyzerExecutionTime, cancellationToken).ConfigureAwait(false);
+                    var result = await diagnosticComputer.GetDiagnosticsAsync(
+                        arguments.AnalyzerIds,
+                        reportSuppressedDiagnostics: arguments.ReportSuppressedDiagnostics,
+                        logPerformanceInfo: arguments.LogPerformanceInfo,
+                        getTelemetryInfo: arguments.GetTelemetryInfo,
+                        cancellationToken).ConfigureAwait(false);
 
-                    await RemoteEndPoint.WriteDataToNamedPipeAsync(pipeName, result, (writer, data, cancellationToken) =>
+                    await RemoteEndPoint.WriteDataToNamedPipeAsync(pipeName, (result, documentAnalysisKind), (writer, data, cancellationToken) =>
                     {
-                        var (diagnostics, telemetry) = DiagnosticResultSerializer.WriteDiagnosticAnalysisResults(writer, data, cancellationToken);
+                        var (diagnostics, telemetry) = DiagnosticResultSerializer.WriteDiagnosticAnalysisResults(writer, data.documentAnalysisKind, data.result, cancellationToken);
 
                         // save log for debugging
                         Log(TraceEventType.Information, $"diagnostics: {diagnostics}, telemetry: {telemetry}");

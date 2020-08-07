@@ -8,7 +8,9 @@ using System.Diagnostics;
 using System.Linq;
 using System.Threading;
 using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp.CodeStyle.TypeStyle;
 using Microsoft.CodeAnalysis.CSharp.Extensions;
+using Microsoft.CodeAnalysis.CSharp.Formatting;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Shared.Extensions;
 using Microsoft.CodeAnalysis.Shared.Utilities;
@@ -17,10 +19,8 @@ using Microsoft.CodeAnalysis.Operations;
 
 #if CODE_STYLE
 using OptionSet = Microsoft.CodeAnalysis.Diagnostics.AnalyzerConfigOptions;
-using Microsoft.CodeAnalysis.CSharp.Internal.CodeStyle.TypeStyle;
 #else
-using Microsoft.CodeAnalysis.Options;
-using Microsoft.CodeAnalysis.CSharp.CodeStyle.TypeStyle;
+using OptionSet = Microsoft.CodeAnalysis.Options.OptionSet;
 #endif
 
 namespace Microsoft.CodeAnalysis.CSharp.Utilities
@@ -171,7 +171,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Utilities
             return false;
         }
 
-        private bool TryAnalyzeDeclarationExpression(
+        private static bool TryAnalyzeDeclarationExpression(
             DeclarationExpressionSyntax declarationExpression,
             SemanticModel semanticModel,
             CancellationToken cancellationToken)
@@ -212,7 +212,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Utilities
                 declarationType, newDeclarationType);
         }
 
-        private bool IsSafeToSwitchToVarWithoutNeedingSpeculation(DeclarationExpressionSyntax declarationExpression, SemanticModel semanticModel, CancellationToken cancellationToken)
+        private static bool IsSafeToSwitchToVarWithoutNeedingSpeculation(DeclarationExpressionSyntax declarationExpression, SemanticModel semanticModel, CancellationToken cancellationToken)
         {
             // It's not always safe to convert a decl expression like "Method(out int i)" to
             // "Method(out var i)".  Changing to 'var' may cause overload resolution errors.
@@ -247,7 +247,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Utilities
             // different names for those tuple elements.  Check and make sure the types are the
             // same before proceeding.
 
-            var invocationOp = semanticModel.GetOperation(invocationExpression) as IInvocationOperation;
+            var invocationOp = semanticModel.GetOperation(invocationExpression, cancellationToken) as IInvocationOperation;
             if (invocationOp == null)
                 return false;
 
@@ -287,14 +287,15 @@ namespace Microsoft.CodeAnalysis.CSharp.Utilities
                 return false;
             }
 
-            // cannot use implicit typing on method group or on dynamic
-            var declaredType = semanticModel.GetTypeInfo(typeName.StripRefIfNeeded(), cancellationToken).Type;
-            if (declaredType != null && declaredType.TypeKind == TypeKind.Dynamic)
+            // var cannot be used with target typed new
+            if (expression.IsKind(SyntaxKindEx.ImplicitObjectCreationExpression))
             {
                 return false;
             }
 
-            if (IsSwitchExpressionAndCannotUseVar(typeName, initializer, semanticModel))
+            // cannot use implicit typing on method group or on dynamic
+            var declaredType = semanticModel.GetTypeInfo(typeName.StripRefIfNeeded(), cancellationToken).Type;
+            if (declaredType != null && declaredType.TypeKind == TypeKind.Dynamic)
             {
                 return false;
             }
@@ -340,9 +341,11 @@ namespace Microsoft.CodeAnalysis.CSharp.Utilities
         }
 
         internal static ExpressionSyntax GetInitializerExpression(ExpressionSyntax initializer)
-            => initializer is CheckedExpressionSyntax
-                ? ((CheckedExpressionSyntax)initializer).Expression.WalkDownParentheses()
-                : initializer.WalkDownParentheses();
+        {
+            var current = (initializer as RefExpressionSyntax)?.Expression ?? initializer;
+            current = (current as CheckedExpressionSyntax)?.Expression ?? current;
+            return current.WalkDownParentheses();
+        }
 
         protected override bool ShouldAnalyzeDeclarationExpression(DeclarationExpressionSyntax declaration, SemanticModel semanticModel, CancellationToken cancellationToken)
         {
@@ -354,48 +357,6 @@ namespace Microsoft.CodeAnalysis.CSharp.Utilities
 
             // The base analyzer may impose further limitations
             return base.ShouldAnalyzeDeclarationExpression(declaration, semanticModel, cancellationToken);
-        }
-
-        private bool IsSwitchExpressionAndCannotUseVar(TypeSyntax typeName, ExpressionSyntax initializer, SemanticModel semanticModel)
-        {
-            if (initializer.IsKind(SyntaxKind.SwitchExpression))
-            {
-                // We compare the variable declaration type to each arm's type to see if there is an exact match, or if the
-                // arm type inherits from the variable declaration type. If not, we must use the explicit type instead of var.
-                // Even if 'true' is returned from this method, it is not guaranteed that we can use var. Further checks should occur
-                // after this method is called, such as checking if multiple implicit coversions exist.
-                var declarationType = semanticModel.GetTypeInfo(typeName).Type;
-                var noValidTypeExpressions = true;
-                if (declarationType != null)
-                {
-                    foreach (var arm in ((SwitchExpressionSyntax)initializer).Arms)
-                    {
-                        var expression = arm.Expression;
-                        if (expression.IsKind(SyntaxKind.ParenthesizedExpression, out ParenthesizedExpressionSyntax? parenExpression))
-                        {
-                            expression = parenExpression.WalkDownParentheses();
-                        }
-
-                        if (!expression.IsKind(SyntaxKind.ThrowExpression) && !expression.IsKind(SyntaxKind.NullLiteralExpression) && !expression.IsKind(SyntaxKind.DefaultLiteralExpression))
-                        {
-                            noValidTypeExpressions = false;
-                            var expressionType = semanticModel.GetTypeInfo(expression).Type;
-                            if (expressionType != null && !expressionType.InheritsFromOrEquals(declarationType))
-                            {
-                                return true;
-                            }
-                        }
-                    }
-                }
-
-                // If all arms are either throw statements, null literal expressions, or default literal expressions, return true.
-                if (noValidTypeExpressions)
-                {
-                    return true;
-                }
-            }
-
-            return false;
         }
     }
 }

@@ -54,7 +54,7 @@ namespace Microsoft.VisualStudio.LanguageServices.CSharp.ProjectSystemShim
 
             protected override CompilationOptions ComputeCompilationOptionsWithHostValues(CompilationOptions compilationOptions, IRuleSetFile? ruleSetFile)
             {
-                IDictionary<string, ReportDiagnostic>? ruleSetSpecificDiagnosticOptions = null;
+                IDictionary<string, ReportDiagnostic>? ruleSetSpecificDiagnosticOptions;
 
                 // Get options from the ruleset file, if any, first. That way project-specific
                 // options can override them.
@@ -153,9 +153,7 @@ namespace Microsoft.VisualStudio.LanguageServices.CSharp.ProjectSystemShim
             }
 
             private static string GetIdForErrorCode(int errorCode)
-            {
-                return "CS" + errorCode.ToString("0000");
-            }
+                => "CS" + errorCode.ToString("0000");
 
             private IEnumerable<string> ParseWarningCodes(CompilerOptions compilerOptions)
             {
@@ -177,14 +175,10 @@ namespace Microsoft.VisualStudio.LanguageServices.CSharp.ProjectSystemShim
             }
 
             private bool? GetNullableBooleanOption(CompilerOptions optionID)
-            {
-                return (bool?)_options[(int)optionID];
-            }
+                => (bool?)_options[(int)optionID];
 
             private bool GetBooleanOption(CompilerOptions optionID)
-            {
-                return GetNullableBooleanOption(optionID).GetValueOrDefault(defaultValue: false);
-            }
+                => GetNullableBooleanOption(optionID).GetValueOrDefault(defaultValue: false);
 
             private string? GetFilePathRelativeOption(CompilerOptions optionID)
             {

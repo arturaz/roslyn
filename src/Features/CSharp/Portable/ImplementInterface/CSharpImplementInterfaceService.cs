@@ -21,9 +21,13 @@ namespace Microsoft.CodeAnalysis.CSharp.ImplementInterface
     internal class CSharpImplementInterfaceService : AbstractImplementInterfaceService
     {
         [ImportingConstructor]
+        [Obsolete(MefConstruction.ImportingConstructorMessage, error: true)]
         public CSharpImplementInterfaceService()
         {
         }
+
+        protected override string ToDisplayString(IMethodSymbol disposeImplMethod, SymbolDisplayFormat format)
+            => SymbolDisplay.ToDisplayString(disposeImplMethod, format);
 
         protected override bool TryInitializeState(
             Document document, SemanticModel model, SyntaxNode node, CancellationToken cancellationToken,
@@ -35,8 +39,7 @@ namespace Microsoft.CodeAnalysis.CSharp.ImplementInterface
                     baseType.IsParentKind(SyntaxKind.BaseList) &&
                     baseType.Type == interfaceNode)
                 {
-                    if (interfaceNode.Parent.Parent.IsParentKind(SyntaxKind.ClassDeclaration) ||
-                        interfaceNode.Parent.Parent.IsParentKind(SyntaxKind.StructDeclaration))
+                    if (interfaceNode.Parent.Parent.IsParentKind(SyntaxKind.ClassDeclaration, SyntaxKind.StructDeclaration, SyntaxKind.RecordDeclaration))
                     {
                         var interfaceSymbolInfo = model.GetSymbolInfo(interfaceNode, cancellationToken);
                         if (interfaceSymbolInfo.CandidateReason != CandidateReason.WrongArity)
