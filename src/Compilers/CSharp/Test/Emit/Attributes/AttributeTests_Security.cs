@@ -2,6 +2,8 @@
 // The .NET Foundation licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
+#nullable disable
+
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -759,7 +761,7 @@ namespace N
     }
 }
 ";
-            var compilation = CreateCompilationWithMscorlib40(source, options: TestOptions.ReleaseDll, parseOptions: TestOptions.RegularPreview);
+            var compilation = CreateCompilationWithMscorlib40(source, options: TestOptions.ReleaseDll, parseOptions: TestOptions.Regular9);
             CompileAndVerify(compilation, symbolValidator: module =>
             {
                 ValidateDeclSecurity(module, new DeclSecurityEntry

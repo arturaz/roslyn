@@ -2,8 +2,6 @@
 // The .NET Foundation licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
-#nullable enable
-
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
@@ -53,9 +51,9 @@ namespace Microsoft.CodeAnalysis.CommandLine
         /// The temporary directory a compilation should use instead of <see cref="Path.GetTempPath"/>.  The latter
         /// relies on global state individual compilations should ignore.
         /// </summary>
-        internal string TempDirectory { get; }
+        internal string? TempDirectory { get; }
 
-        internal BuildPathsAlt(string clientDir, string workingDir, string? sdkDir, string tempDir)
+        internal BuildPathsAlt(string clientDir, string workingDir, string? sdkDir, string? tempDir)
         {
             ClientDirectory = clientDir;
             WorkingDirectory = workingDir;
@@ -77,7 +75,7 @@ namespace Microsoft.CodeAnalysis.CommandLine
         /// <summary>
         /// Determines if the compiler server is supported in this environment.
         /// </summary>
-        internal static bool IsCompilerServerSupported => GetPipeNameForPathOpt("") is object;
+        internal static bool IsCompilerServerSupported => GetPipeNameForPath("") is object;
 
         public static Task<BuildResponse> RunServerCompilationAsync(
             RequestLanguage language,
@@ -88,7 +86,7 @@ namespace Microsoft.CodeAnalysis.CommandLine
             string? libEnvVariable,
             CancellationToken cancellationToken)
         {
-            var pipeNameOpt = sharedCompilationId ?? GetPipeNameForPathOpt(buildPaths.ClientDirectory);
+            var pipeNameOpt = sharedCompilationId ?? GetPipeNameForPath(buildPaths.ClientDirectory);
 
             return RunServerCompilationCoreAsync(
                 language,
@@ -136,7 +134,7 @@ namespace Microsoft.CodeAnalysis.CommandLine
             }
             else
             {
-                var pipe = await pipeTask.ConfigureAwait(false);
+                using var pipe = await pipeTask.ConfigureAwait(false);
                 if (pipe is null)
                 {
                     return new RejectedBuildResponse("Failed to connect to server");
@@ -313,11 +311,11 @@ namespace Microsoft.CodeAnalysis.CommandLine
 
             while (!cancellationToken.IsCancellationRequested && pipeStream.IsConnected)
             {
-                // Wait a tenth of a second before trying again
-                await Task.Delay(millisecondsDelay: 100, cancellationToken).ConfigureAwait(false);
-
                 try
                 {
+                    // Wait a tenth of a second before trying again
+                    await Task.Delay(millisecondsDelay: 100, cancellationToken).ConfigureAwait(false);
+
                     await pipeStream.ReadAsync(buffer, 0, 0, cancellationToken).ConfigureAwait(false);
                 }
                 catch (OperationCanceledException)
@@ -347,7 +345,7 @@ namespace Microsoft.CodeAnalysis.CommandLine
             int timeoutMs,
             CancellationToken cancellationToken)
         {
-            NamedPipeClientStream pipeStream;
+            NamedPipeClientStream? pipeStream = null;
             try
             {
                 // Machine-local named pipes are named "\\.\pipe\<pipename>".
@@ -381,6 +379,7 @@ namespace Microsoft.CodeAnalysis.CommandLine
                     //              time-out period has expired.
 
                     LogException(e, $"Connecting to server timed out after {timeoutMs} ms");
+                    pipeStream.Dispose();
                     return null;
                 }
                 Log("Named pipe '{0}' connected", pipeName);
@@ -392,6 +391,7 @@ namespace Microsoft.CodeAnalysis.CommandLine
                 // Verify fails on our CI server
                 // if (!NamedPipeUtil.CheckPipeConnectionOwnership(pipeStream))
                 // {
+                //     pipeStream.Dispose();
                 //     LogError("Owner of named pipe is incorrect");
                 //     return null;
                 // }
@@ -401,6 +401,7 @@ namespace Microsoft.CodeAnalysis.CommandLine
             catch (Exception e) when (!(e is TaskCanceledException || e is OperationCanceledException))
             {
                 LogException(e, "Exception while connecting to process");
+                pipeStream?.Dispose();
                 return null;
             }
         }
@@ -494,7 +495,7 @@ namespace Microsoft.CodeAnalysis.CommandLine
         /// <returns>
         /// Null if not enough information was found to create a valid pipe name.
         /// </returns>
-        internal static string? GetPipeNameForPathOpt(string compilerExeDirectory)
+        internal static string? GetPipeNameForPath(string compilerExeDirectory)
         {
             // Prefix with username and elevation
             bool isAdmin = false;

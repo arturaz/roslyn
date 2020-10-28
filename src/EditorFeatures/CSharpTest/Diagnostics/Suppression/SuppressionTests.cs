@@ -2,6 +2,8 @@
 // The .NET Foundation licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
+#nullable disable
+
 using System;
 using System.Collections.Immutable;
 using System.Linq;
@@ -254,7 +256,8 @@ class Class
                     var analyzerReference = new AnalyzerImageReference(ImmutableArray.Create<DiagnosticAnalyzer>(new CSharpCompilerDiagnosticAnalyzer()));
                     workspace.TryApplyChanges(workspace.CurrentSolution.WithAnalyzerReferences(new[] { analyzerReference }));
 
-                    var diagnosticService = new TestDiagnosticAnalyzerService();
+                    Assert.IsType<MockDiagnosticUpdateSourceRegistrationService>(workspace.ExportProvider.GetExportedValue<IDiagnosticUpdateSourceRegistrationService>());
+                    var diagnosticService = Assert.IsType<DiagnosticAnalyzerService>(workspace.ExportProvider.GetExportedValue<IDiagnosticAnalyzerService>());
                     var incrementalAnalyzer = diagnosticService.CreateIncrementalAnalyzer(workspace);
                     var suppressionProvider = CreateDiagnosticProviderAndFixer(workspace).Item2;
                     var suppressionProviderFactory = new Lazy<IConfigurationFixProvider, CodeChangeProviderMetadata>(() => suppressionProvider,

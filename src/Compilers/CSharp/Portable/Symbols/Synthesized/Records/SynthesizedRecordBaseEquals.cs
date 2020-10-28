@@ -2,8 +2,6 @@
 // The .NET Foundation licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
-#nullable enable
-
 using System.Collections.Immutable;
 using System.Diagnostics;
 using System.Linq;
@@ -54,7 +52,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
             if (overridden is object &&
                 !overridden.ContainingType.Equals(ContainingType.BaseTypeNoUseSiteDiagnostics, TypeCompareKind.AllIgnoreOptions))
             {
-                diagnostics.Add(ErrorCode.ERR_DoesNotOverrideBaseEquals, Locations[0], this, ContainingType.BaseTypeNoUseSiteDiagnostics);
+                diagnostics.Add(ErrorCode.ERR_DoesNotOverrideBaseMethod, Locations[0], this, ContainingType.BaseTypeNoUseSiteDiagnostics);
             }
         }
 

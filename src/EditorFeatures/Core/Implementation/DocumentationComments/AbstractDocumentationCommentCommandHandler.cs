@@ -2,10 +2,9 @@
 // The .NET Foundation licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
-#nullable enable
-
 using System;
 using System.Threading;
+using Microsoft.CodeAnalysis.DocumentationComments;
 using Microsoft.CodeAnalysis.Editor.Host;
 using Microsoft.CodeAnalysis.Editor.Shared.Extensions;
 using Microsoft.CodeAnalysis.Options;
@@ -118,6 +117,12 @@ namespace Microsoft.CodeAnalysis.Editor.Implementation.DocumentationComments
                 return;
             }
 
+            // Don't execute in cloud environment, as we let LSP handle that
+            if (args.SubjectBuffer.IsInCloudEnvironmentClientContext())
+            {
+                return;
+            }
+
             CompleteComment(args.SubjectBuffer, args.TextView, InsertOnCharacterTyped, CancellationToken.None);
         }
 
@@ -126,6 +131,12 @@ namespace Microsoft.CodeAnalysis.Editor.Implementation.DocumentationComments
 
         public bool ExecuteCommand(ReturnKeyCommandArgs args, CommandExecutionContext context)
         {
+            // Don't execute in cloud environment, as we let LSP handle that
+            if (args.SubjectBuffer.IsInCloudEnvironmentClientContext())
+            {
+                return false;
+            }
+
             // Check to see if the current line starts with exterior trivia. If so, we'll take over.
             // If not, let the nextHandler run.
 

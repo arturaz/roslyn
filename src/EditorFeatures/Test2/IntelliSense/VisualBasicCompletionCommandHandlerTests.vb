@@ -144,7 +144,7 @@ End Module
         End Sub
 
         <WorkItem(5487, "https://github.com/dotnet/roslyn/issues/5487")>
-        <WpfFact, Trait(Traits.Feature, Traits.Features.Completion)>
+        <WpfFact(Skip:="https://github.com/dotnet/roslyn/issues/48870"), Trait(Traits.Feature, Traits.Features.Completion)>
         Public Async Function TestCommitCharTypedAtTheBeginingOfTheFilterSpan() As Task
             Using state = TestStateFactory.CreateVisualBasicTestState(
                   <Document><![CDATA[
@@ -499,7 +499,8 @@ End Class
             End Using
         End Function
 
-        <WpfFact, Trait(Traits.Feature, Traits.Features.Completion)>
+        <WpfFact(Skip:="https://github.com/dotnet/roslyn/issues/48870")>
+        <Trait(Traits.Feature, Traits.Features.Completion)>
         Public Async Function TestNavigateOutOfItemChangeSpan() As Task
             ' Code must be left-aligned because of https://github.com/dotnet/roslyn/issues/27988
             Using state = TestStateFactory.CreateVisualBasicTestState(
@@ -1024,7 +1025,7 @@ End Class
         Public Async Function TestExclusiveNamedParameterCompletion() As Task
             Using state = TestStateFactory.CreateTestStateFromWorkspace(
                       <Workspace>
-                          <Project Language="Visual Basic" CommonReferences="true" LanguageVersion="VisualBasic15">
+                          <Project Language="Visual Basic" CommonReferences="true" LanguageVersion="15">
                               <Document>
 Class Class1
     Private Sub Test()
@@ -1053,7 +1054,7 @@ End Class
         Public Async Function TestExclusiveNamedParameterCompletion2() As Task
             Using state = TestStateFactory.CreateTestStateFromWorkspace(
                       <Workspace>
-                          <Project Language="Visual Basic" CommonReferences="true" LanguageVersion="VisualBasic15">
+                          <Project Language="Visual Basic" CommonReferences="true" LanguageVersion="15">
                               <Document>
 Class Goo
     Private Sub Test()
@@ -1308,7 +1309,8 @@ End Class
             End Using
         End Function
 
-        <WpfFact, Trait(Traits.Feature, Traits.Features.Completion)>
+        <WpfFact(Skip:="https://github.com/dotnet/roslyn/issues/48870")>
+        <Trait(Traits.Feature, Traits.Features.Completion)>
         Public Async Function CompletionUpAfterBackSpacetoWord() As Task
             Using state = TestStateFactory.CreateVisualBasicTestState(
                               <Document>
@@ -2551,7 +2553,7 @@ $"<{ VBFeaturesResources.Extension }> Function IEnumerable(Of 'a).ToArray() As '
         Public Async Function TestNonTrailingNamedArgumentInVB15_3() As Task
             Using state = TestStateFactory.CreateTestStateFromWorkspace(
                  <Workspace>
-                     <Project Language="Visual Basic" LanguageVersion="VisualBasic15_3" CommonReferences="true" AssemblyName="VBProj">
+                     <Project Language="Visual Basic" LanguageVersion="15.3" CommonReferences="true" AssemblyName="VBProj">
                          <Document FilePath="C.vb">
 Class C
     Sub M()
@@ -2576,7 +2578,7 @@ End Class
         Public Async Function TestNonTrailingNamedArgumentInVB15_5() As Task
             Using state = TestStateFactory.CreateTestStateFromWorkspace(
                  <Workspace>
-                     <Project Language="Visual Basic" LanguageVersion="VisualBasic15_5" CommonReferences="true" AssemblyName="VBProj">
+                     <Project Language="Visual Basic" LanguageVersion="15.5" CommonReferences="true" AssemblyName="VBProj">
                          <Document FilePath="C.vb">
 Class C
     Sub M()

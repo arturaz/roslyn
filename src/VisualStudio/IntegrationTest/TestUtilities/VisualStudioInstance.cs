@@ -2,6 +2,8 @@
 // The .NET Foundation licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
+#nullable disable
+
 using System;
 using System.Collections.Immutable;
 using System.Linq;
@@ -216,7 +218,7 @@ namespace Microsoft.VisualStudio.IntegrationTest.Utilities
             Workspace.CleanUpWaitingService();
             Workspace.CleanUpWorkspace();
             SolutionExplorer.CleanUpOpenSolution();
-            Workspace.WaitForAllAsyncOperations(Helper.HangMitigatingTimeout);
+            Workspace.WaitForAllAsyncOperationsOrFail(Helper.HangMitigatingTimeout);
 
             // Close any windows leftover from previous (failed) tests
             InteractiveWindow.CloseInteractiveWindow();

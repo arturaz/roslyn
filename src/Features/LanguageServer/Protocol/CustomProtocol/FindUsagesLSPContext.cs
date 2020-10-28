@@ -2,22 +2,19 @@
 // The .NET Foundation licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
-#nullable enable
-
 using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
-using System.Diagnostics;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.CodeAnalysis.Classification;
+using Microsoft.CodeAnalysis.Editor.Shared.Extensions;
 using Microsoft.CodeAnalysis.ErrorReporting;
 using Microsoft.CodeAnalysis.FindSymbols;
 using Microsoft.CodeAnalysis.FindSymbols.Finders;
 using Microsoft.CodeAnalysis.FindUsages;
 using Microsoft.CodeAnalysis.MetadataAsSource;
-using Microsoft.CodeAnalysis.PooledObjects;
 using Microsoft.VisualStudio.LanguageServer.Protocol;
 using Microsoft.VisualStudio.Text.Adornments;
 using Roslyn.Utilities;
@@ -27,7 +24,7 @@ namespace Microsoft.CodeAnalysis.LanguageServer.CustomProtocol
 {
     internal class FindUsagesLSPContext : FindUsagesContext
     {
-        private readonly IProgress<object[]> _progress;
+        private readonly IProgress<VSReferenceItem[]> _progress;
         private readonly Document _document;
         private readonly int _position;
         private readonly IMetadataAsSourceFileService _metadataAsSourceFileService;
@@ -60,7 +57,7 @@ namespace Microsoft.CodeAnalysis.LanguageServer.CustomProtocol
         public override CancellationToken CancellationToken { get; }
 
         public FindUsagesLSPContext(
-            IProgress<object[]> progress,
+            IProgress<VSReferenceItem[]> progress,
             Document document,
             int position,
             IMetadataAsSourceFileService metadataAsSourceFileService,
@@ -77,9 +74,10 @@ namespace Microsoft.CodeAnalysis.LanguageServer.CustomProtocol
         }
 
         // After all definitions/references have been found, wait here until all results have been reported.
-        public override Task OnCompletedAsync() => _workQueue.WaitUntilCurrentBatchCompletesAsync();
+        public override async ValueTask OnCompletedAsync()
+            => await _workQueue.WaitUntilCurrentBatchCompletesAsync().ConfigureAwait(false);
 
-        public override async Task OnDefinitionFoundAsync(DefinitionItem definition)
+        public override async ValueTask OnDefinitionFoundAsync(DefinitionItem definition)
         {
             using (await _semaphore.DisposableWaitAsync(CancellationToken).ConfigureAwait(false))
             {
@@ -96,7 +94,7 @@ namespace Microsoft.CodeAnalysis.LanguageServer.CustomProtocol
                 var definitionItem = await GenerateVSReferenceItemAsync(
                     _id, definitionId: _id, _document, _position, definition.SourceSpans.FirstOrDefault(),
                     definition.DisplayableProperties, _metadataAsSourceFileService, definition.GetClassifiedText(),
-                    symbolUsageInfo: null, CancellationToken).ConfigureAwait(false);
+                    definition.Tags.GetFirstGlyph(), symbolUsageInfo: null, CancellationToken).ConfigureAwait(false);
 
                 if (definitionItem != null)
                 {
@@ -114,7 +112,7 @@ namespace Microsoft.CodeAnalysis.LanguageServer.CustomProtocol
             }
         }
 
-        public override async Task OnReferenceFoundAsync(SourceReferenceItem reference)
+        public override async ValueTask OnReferenceFoundAsync(SourceReferenceItem reference)
         {
             using (await _semaphore.DisposableWaitAsync(CancellationToken).ConfigureAwait(false))
             {
@@ -138,7 +136,7 @@ namespace Microsoft.CodeAnalysis.LanguageServer.CustomProtocol
                 var referenceItem = await GenerateVSReferenceItemAsync(
                     _id, definitionId, _document, _position, reference.SourceSpan,
                     reference.AdditionalProperties, _metadataAsSourceFileService, definitionText: null,
-                    reference.SymbolUsageInfo, CancellationToken).ConfigureAwait(false);
+                    definitionGlyph: Glyph.None, reference.SymbolUsageInfo, CancellationToken).ConfigureAwait(false);
 
                 if (referenceItem != null)
                 {
@@ -156,6 +154,7 @@ namespace Microsoft.CodeAnalysis.LanguageServer.CustomProtocol
             ImmutableDictionary<string, string> properties,
             IMetadataAsSourceFileService metadataAsSourceFileService,
             ClassifiedTextElement? definitionText,
+            Glyph definitionGlyph,
             SymbolUsageInfo? symbolUsageInfo,
             CancellationToken cancellationToken)
         {
@@ -177,21 +176,28 @@ namespace Microsoft.CodeAnalysis.LanguageServer.CustomProtocol
             // https://github.com/dotnet/roslyn/issues/42847
             var result = new LSP.VSReferenceItem
             {
-                ContainingMember = properties.TryGetValue(
-                    AbstractReferenceFinder.ContainingMemberInfoPropertyName, out var referenceContainingMember) ? referenceContainingMember : null,
-                ContainingType = properties.TryGetValue(
-                    AbstractReferenceFinder.ContainingTypeInfoPropertyName, out var referenceContainingType) ? referenceContainingType : null,
                 DefinitionId = definitionId,
                 DefinitionText = definitionText,    // Only definitions should have a non-null DefinitionText
+                DefinitionIcon = definitionGlyph.GetImageElement(),
                 DisplayPath = location.Uri.LocalPath,
-                DocumentName = documentSpan == default ? null : documentSpan.Document.Name,
                 Id = id,
                 Kind = symbolUsageInfo.HasValue ? ProtocolConversions.SymbolUsageInfoToReferenceKinds(symbolUsageInfo.Value) : Array.Empty<ReferenceKind>(),
                 Location = location,
-                ProjectName = documentSpan == default ? null : documentSpan.Document.Project.Name,
                 ResolutionStatus = ResolutionStatusKind.ConfirmedAsReference,
                 Text = text,
             };
+
+            if (documentSpan.Document != null)
+            {
+                result.DocumentName = documentSpan.Document.Name;
+                result.ProjectName = documentSpan.Document.Project.Name;
+            }
+
+            if (properties.TryGetValue(AbstractReferenceFinder.ContainingMemberInfoPropertyName, out var referenceContainingMember))
+                result.ContainingMember = referenceContainingMember;
+
+            if (properties.TryGetValue(AbstractReferenceFinder.ContainingTypeInfoPropertyName, out var referenceContainingType))
+                result.ContainingType = referenceContainingType;
 
             return result;
 
@@ -234,7 +240,7 @@ namespace Microsoft.CodeAnalysis.LanguageServer.CustomProtocol
                         Range = ProtocolConversions.LinePositionToRange(linePosSpan),
                     };
                 }
-                catch (UriFormatException e) when (FatalError.ReportWithoutCrash(e))
+                catch (UriFormatException e) when (FatalError.ReportAndCatch(e))
                 {
                     // We might reach this point if the file path is formatted incorrectly.
                     return null;

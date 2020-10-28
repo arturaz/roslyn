@@ -2,8 +2,6 @@
 // The .NET Foundation licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
-#nullable enable
-
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Diagnostics.CodeAnalysis;
@@ -193,7 +191,7 @@ namespace Microsoft.CodeAnalysis.QuickInfo
                         var builder = ImmutableArray.CreateBuilder<TaggedText>();
                         builder.AddText(FeaturesResources.Awaited_task_returns_0.Substring(0, symbolIndex));
                         builder.AddRange(mainDescriptionTaggedParts);
-                        builder.AddText(FeaturesResources.Awaited_task_returns_0.Substring(symbolIndex + defaultSymbol.Length));
+                        builder.AddText(FeaturesResources.Awaited_task_returns_0[(symbolIndex + defaultSymbol.Length)..]);
 
                         AddSection(QuickInfoSectionKinds.Description, builder.ToImmutable());
                     }

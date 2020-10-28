@@ -2,6 +2,8 @@
 // The .NET Foundation licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
+#nullable disable
+
 using System.Threading.Tasks;
 using Microsoft.CodeAnalysis.CodeStyle;
 using Microsoft.CodeAnalysis.CSharp;
@@ -13,6 +15,7 @@ using Microsoft.CodeAnalysis.Testing;
 using Roslyn.Test.Utilities;
 using Roslyn.Utilities;
 using Xunit;
+using Xunit.Abstractions;
 using static Roslyn.Test.Utilities.TestHelpers;
 using VerifyCS = Microsoft.CodeAnalysis.Editor.UnitTests.CodeActions.CSharpCodeFixVerifier<
     Microsoft.CodeAnalysis.CSharp.RemoveUnusedParametersAndValues.CSharpRemoveUnusedParametersAndValuesDiagnosticAnalyzer,
@@ -22,6 +25,11 @@ namespace Microsoft.CodeAnalysis.Editor.CSharp.UnitTests.RemoveUnusedParametersA
 {
     public class RemoveUnusedValueAssignmentTests : RemoveUnusedValuesTestsBase
     {
+        public RemoveUnusedValueAssignmentTests(ITestOutputHelper logger)
+          : base(logger)
+        {
+        }
+
         private protected override OptionsCollection PreferNone =>
             Option(CSharpCodeStyleOptions.UnusedValueAssignment,
                    new CodeStyleOption2<UnusedValuePreference>(UnusedValuePreference.DiscardVariable, NotificationOption2.None));
@@ -2420,7 +2428,37 @@ $@"class C
                 break;
         };
     }
-}", options: PreferDiscard);
+}", options: PreferDiscard, parseOptions: new CSharpParseOptions(LanguageVersion.CSharp8));
+        }
+
+        [Fact, Trait(Traits.Feature, Traits.Features.CodeActionsRemoveUnusedValues)]
+        public async Task DeclarationPatternInSwitchCase_WithOnlyWriteReference_PreferDiscard_CSharp9()
+        {
+            await TestInRegularAndScriptAsync(
+@"class C
+{
+    void M(object p)
+    {
+        switch (p)
+        {
+            case int [|x|]:
+                x = 1;
+                break;
+        };
+    }
+}",
+@"class C
+{
+    void M(object p)
+    {
+        switch (p)
+        {
+            case int:
+                int x = 1;
+                break;
+        };
+    }
+}", options: PreferDiscard, parseOptions: new CSharpParseOptions(LanguageVersion.CSharp9));
         }
 
         [Theory, Trait(Traits.Feature, Traits.Features.CodeActionsRemoveUnusedValues)]
@@ -4918,7 +4956,7 @@ $@"class C
                 break;
         }}
     }}
-}}", optionName);
+}}", optionName, parseOptions: new CSharpParseOptions(LanguageVersion.CSharp8));
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.CodeActionsRemoveUnusedValues)]
@@ -7684,7 +7722,7 @@ class C
                 break;
         };
     }
-}", options: PreferDiscard);
+}", options: PreferDiscard, parseOptions: new CSharpParseOptions(LanguageVersion.CSharp8));
         }
 
         [WorkItem(32856, "https://github.com/dotnet/roslyn/issues/33312")]
@@ -8131,7 +8169,7 @@ class C : IDisposable
         using var [|x|] = new C();
     }
 }", options: PreferDiscard,
-    parseOptions: CSharpParseOptions.Default.WithLanguageVersion(LanguageVersion.Preview));
+    parseOptions: CSharpParseOptions.Default.WithLanguageVersion(LanguageVersion.CSharp9));
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.CodeActionsRemoveUnusedValues)]
@@ -8153,7 +8191,7 @@ class C : IDisposable
         using var [|x|] = new C() { P = 1 };
     }
 }", options: PreferDiscard,
-    parseOptions: CSharpParseOptions.Default.WithLanguageVersion(LanguageVersion.Preview));
+    parseOptions: CSharpParseOptions.Default.WithLanguageVersion(LanguageVersion.CSharp9));
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.CodeActionsRemoveUnusedValues)]
@@ -8652,6 +8690,57 @@ class C
 }
 ";
             await TestExactActionSetOfferedAsync(source, new[] { CodeFixesResources.Remove_redundant_assignment });
+        }
+
+        [WorkItem(38507, "https://github.com/dotnet/roslyn/issues/46251")]
+        [Fact, Trait(Traits.Feature, Traits.Features.CodeActionsRemoveUnusedValues)]
+        public async Task TestCodeFixForAllInDocumentForNestedDiagnostic()
+        {
+            var source = @"
+using System;
+namespace ConsoleApp
+{
+	public static class ConsoleApp
+    {
+		public static void Main(string[] args)
+        {
+            {|FixAllInDocument:Foo(() => { Bar(); return true; })|};
+        }
+
+        public static bool Foo(Func<bool> func)
+        {
+            return func. Invoke();
+        }
+
+        public static bool Bar()
+        {
+            return true;
+        }
+	}
+}";
+            var expected = @"
+using System;
+namespace ConsoleApp
+{
+	public static class ConsoleApp
+    {
+		public static void Main(string[] args)
+        {
+            _ = Foo(() => { _ = Bar(); return true; });
+        }
+
+        public static bool Foo(Func<bool> func)
+        {
+            return func. Invoke();
+        }
+
+        public static bool Bar()
+        {
+            return true;
+        }
+	}
+}";
+            await TestInRegularAndScriptAsync(source, expected, options: PreferDiscard).ConfigureAwait(false);
         }
     }
 }

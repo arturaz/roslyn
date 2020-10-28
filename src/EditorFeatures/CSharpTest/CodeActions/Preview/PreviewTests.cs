@@ -2,6 +2,8 @@
 // The .NET Foundation licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
+#nullable disable
+
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -10,22 +12,26 @@ using System.Threading.Tasks;
 using Microsoft.CodeAnalysis.CodeActions;
 using Microsoft.CodeAnalysis.CodeRefactorings;
 using Microsoft.CodeAnalysis.CSharp;
-using Microsoft.CodeAnalysis.Editor.UnitTests.Workspaces;
-using Microsoft.CodeAnalysis.Text;
-using Roslyn.Test.Utilities;
-using Roslyn.Utilities;
-using Xunit;
+using Microsoft.CodeAnalysis.Diagnostics;
 using Microsoft.CodeAnalysis.Editor.Implementation.Preview;
 using Microsoft.CodeAnalysis.Editor.UnitTests;
+using Microsoft.CodeAnalysis.Editor.UnitTests.Diagnostics;
 using Microsoft.CodeAnalysis.Editor.UnitTests.Preview;
+using Microsoft.CodeAnalysis.Editor.UnitTests.Workspaces;
 using Microsoft.CodeAnalysis.Test.Utilities;
+using Microsoft.CodeAnalysis.Text;
+using Roslyn.Test.Utilities;
+using Xunit;
 
 namespace Microsoft.CodeAnalysis.Editor.CSharp.UnitTests.CodeRefactorings
 {
     public partial class PreviewTests : AbstractCSharpCodeActionTest
     {
-        private static readonly TestComposition s_composition = EditorTestCompositions.EditorFeaturesWpf.AddParts(
-            typeof(MockPreviewPaneService));
+        private static readonly TestComposition s_composition = EditorTestCompositions.EditorFeaturesWpf
+            .AddExcludedPartTypes(typeof(IDiagnosticUpdateSourceRegistrationService))
+            .AddParts(
+                typeof(MockDiagnosticUpdateSourceRegistrationService),
+                typeof(MockPreviewPaneService));
 
         private const string AddedDocumentName = "AddedDocument";
         private const string AddedDocumentText = "class C1 {}";

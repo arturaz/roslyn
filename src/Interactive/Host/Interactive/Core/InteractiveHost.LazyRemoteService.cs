@@ -2,8 +2,6 @@
 // The .NET Foundation licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
-#nullable enable
-
 extern alias Scripting;
 
 using System;
@@ -125,7 +123,7 @@ namespace Microsoft.CodeAnalysis.Interactive
 
                     return new InitializedRemoteService(remoteService, result);
                 }
-                catch (Exception e) when (FatalError.ReportUnlessCanceled(e))
+                catch (Exception e) when (FatalError.ReportAndPropagateUnlessCanceled(e))
                 {
                     throw ExceptionUtilities.Unreachable;
                 }
@@ -190,7 +188,7 @@ namespace Microsoft.CodeAnalysis.Interactive
                     _cancellationSource.Cancel();
                 }
 
-                // Connecting the named pipe client would hang if the process exits before the connection is established,
+                // Connecting the named pipe client would block if the process exits before the connection is established,
                 // as the client waits for the server to become available. We signal the cancellation token to abort.
                 newProcess.Exited += ProcessExitedBeforeEstablishingConnection;
 

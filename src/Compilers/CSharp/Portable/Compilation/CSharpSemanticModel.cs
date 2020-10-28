@@ -2,6 +2,8 @@
 // The .NET Foundation licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
+#nullable disable
+
 using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
@@ -21,7 +23,7 @@ namespace Microsoft.CodeAnalysis.CSharp
     /// <summary>
     /// Allows asking semantic questions about a tree of syntax nodes in a Compilation. Typically,
     /// an instance is obtained by a call to <see cref="Compilation"/>.<see
-    /// cref="Compilation.GetSemanticModel"/>. 
+    /// cref="Compilation.GetSemanticModel(SyntaxTree, bool)"/>. 
     /// </summary>
     /// <remarks>
     /// <para>An instance of <see cref="CSharpSemanticModel"/> caches local symbols and semantic
@@ -5262,7 +5264,9 @@ namespace Microsoft.CodeAnalysis.CSharp
         {
             var syntaxTree = (CSharpSyntaxTree)Root.SyntaxTree;
             NullableContextState contextState = syntaxTree.GetNullableContextState(position);
-            var defaultState = syntaxTree.IsGeneratedCode() ? NullableContextOptions.Disable : Compilation.Options.NullableContextOptions;
+            var defaultState = syntaxTree.IsGeneratedCode(Compilation.Options.SyntaxTreeOptionsProvider, CancellationToken.None)
+                ? NullableContextOptions.Disable
+                : Compilation.Options.NullableContextOptions;
 
             NullableContext context = getFlag(contextState.AnnotationsState, defaultState.AnnotationsEnabled(), NullableContext.AnnotationsContextInherited, NullableContext.AnnotationsEnabled);
             context |= getFlag(contextState.WarningsState, defaultState.WarningsEnabled(), NullableContext.WarningsContextInherited, NullableContext.WarningsEnabled);

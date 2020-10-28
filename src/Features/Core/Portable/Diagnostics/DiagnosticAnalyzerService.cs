@@ -2,8 +2,6 @@
 // The .NET Foundation licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
-#nullable enable
-
 using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
@@ -44,19 +42,9 @@ namespace Microsoft.CodeAnalysis.Diagnostics
         public DiagnosticAnalyzerService(
             IDiagnosticUpdateSourceRegistrationService registrationService,
             IAsynchronousOperationListenerProvider listenerProvider)
-            : this(registrationService,
-                   listenerProvider.GetListener(FeatureAttribute.DiagnosticService))
-        {
-        }
-
-        // protected for testing purposes.
-        [SuppressMessage("RoslynDiagnosticsReliability", "RS0034:Exported parts should have [ImportingConstructor]", Justification = "Used incorrectly by tests")]
-        protected DiagnosticAnalyzerService(
-            IDiagnosticUpdateSourceRegistrationService registrationService,
-            IAsynchronousOperationListener? listener)
         {
             AnalyzerInfoCache = new DiagnosticAnalyzerInfoCache();
-            Listener = listener ?? AsynchronousOperationListenerProvider.NullListener;
+            Listener = listenerProvider.GetListener(FeatureAttribute.DiagnosticService);
 
             _map = new ConditionalWeakTable<Workspace, DiagnosticIncrementalAnalyzer>();
             _createIncrementalAnalyzer = CreateIncrementalAnalyzerCallback;
@@ -179,16 +167,6 @@ namespace Microsoft.CodeAnalysis.Diagnostics
             }
 
             return SpecializedTasks.EmptyImmutableArray<DiagnosticData>();
-        }
-
-        public bool IsCompilationEndAnalyzer(DiagnosticAnalyzer diagnosticAnalyzer, Project project, Compilation compilation)
-        {
-            if (_map.TryGetValue(project.Solution.Workspace, out var analyzer))
-            {
-                return analyzer.IsCompilationEndAnalyzer(diagnosticAnalyzer, project, compilation);
-            }
-
-            return false;
         }
 
         public bool ContainsDiagnostics(Workspace workspace, ProjectId projectId)

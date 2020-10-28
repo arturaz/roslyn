@@ -2,8 +2,6 @@
 // The .NET Foundation licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
-#nullable enable
-
 using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
@@ -470,24 +468,6 @@ namespace Microsoft.CodeAnalysis
             }
 
             var newState = _state.WithProjectParseOptions(projectId, options);
-            if (newState == _state)
-            {
-                return this;
-            }
-
-            return new Solution(newState);
-        }
-
-        /// <summary>
-        /// Update a project as a result of option changes.
-        /// 
-        /// TODO: https://github.com/dotnet/roslyn/issues/42448
-        /// this is a temporary workaround until editorconfig becomes real part of roslyn solution snapshot.
-        /// until then, this will explicitly fork current solution snapshot
-        /// </summary>
-        internal Solution WithProjectOptionsChanged(ProjectId projectId)
-        {
-            var newState = _state.WithProjectOptionsChanged(projectId);
             if (newState == _state)
             {
                 return this;
@@ -1792,7 +1772,7 @@ namespace Microsoft.CodeAnalysis
             return new Solution(newState);
         }
 
-        private void CheckContainsProject([NotNull] ProjectId? projectId)
+        private void CheckContainsProject(ProjectId projectId)
         {
             if (projectId == null)
             {
@@ -1805,7 +1785,7 @@ namespace Microsoft.CodeAnalysis
             }
         }
 
-        private void CheckContainsDocument([NotNull] DocumentId? documentId)
+        private void CheckContainsDocument(DocumentId documentId)
         {
             if (documentId == null)
             {
@@ -1831,7 +1811,7 @@ namespace Microsoft.CodeAnalysis
             }
         }
 
-        private void CheckContainsAdditionalDocument([NotNull] DocumentId? documentId)
+        private void CheckContainsAdditionalDocument(DocumentId documentId)
         {
             if (documentId == null)
             {
@@ -1857,7 +1837,7 @@ namespace Microsoft.CodeAnalysis
             }
         }
 
-        private void CheckContainsAnalyzerConfigDocument([NotNull] DocumentId? documentId)
+        private void CheckContainsAnalyzerConfigDocument(DocumentId documentId)
         {
             if (documentId == null)
             {

@@ -2,6 +2,8 @@
 // The .NET Foundation licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
+#nullable disable
+
 using System.Collections.Immutable;
 using System.Linq;
 using System.Reflection;
@@ -23,7 +25,7 @@ namespace Microsoft.CodeAnalysis.CSharp.UnitTests
     [CompilerTrait(CompilerFeature.TopLevelStatements)]
     public class TopLevelStatementsTests : CompilingTestBase
     {
-        private static CSharpParseOptions DefaultParseOptions => TestOptions.RegularPreview;
+        private static CSharpParseOptions DefaultParseOptions => TestOptions.Regular9;
 
         [Fact]
         public void Simple_01()
@@ -601,9 +603,9 @@ void local() => System.Console.WriteLine(i);
             var comp = CreateCompilation(text, options: TestOptions.DebugExe, parseOptions: TestOptions.Regular8);
 
             comp.VerifyDiagnostics(
-                // (1,1): error CS8652: The feature 'top-level statements' is currently in Preview and *unsupported*. To use Preview features, use the 'preview' language version.
+                // (1,1): error CS8400: Feature 'top-level statements' is not available in C# 8.0. Please use language version 9.0 or greater.
                 // System.Console.WriteLine("Hi!");
-                Diagnostic(ErrorCode.ERR_FeatureInPreview, @"System.Console.WriteLine(""Hi!"");").WithArguments("top-level statements").WithLocation(1, 1)
+                Diagnostic(ErrorCode.ERR_FeatureNotAvailableInVersion8, @"System.Console.WriteLine(""Hi!"");").WithArguments("top-level statements", "9.0").WithLocation(1, 1)
                 );
         }
 
@@ -1962,9 +1964,9 @@ namespace N1
 
             comp = CreateCompilation(new[] { text1, text2 }, options: TestOptions.DebugExe, parseOptions: TestOptions.Regular7);
             comp.VerifyDiagnostics(
-                // (2,1): error CS8652: The feature 'top-level statements' is currently in Preview and *unsupported*. To use Preview features, use the 'preview' language version.
+                // (2,1): error CS8107: Feature 'top-level statements' is not available in C# 7.0. Please use language version 9.0 or greater.
                 // string Test = "1";
-                Diagnostic(ErrorCode.ERR_FeatureInPreview, @"string Test = ""1"";").WithArguments("top-level statements").WithLocation(2, 1)
+                Diagnostic(ErrorCode.ERR_FeatureNotAvailableInVersion7, @"string Test = ""1"";").WithArguments("top-level statements", "9.0").WithLocation(2, 1)
                 );
         }
 
@@ -2339,9 +2341,9 @@ namespace N1
 
             comp = CreateCompilation(new[] { text1, text2 }, options: TestOptions.DebugExe, parseOptions: TestOptions.Regular7);
             comp.VerifyDiagnostics(
-                // (2,1): error CS8652: The feature 'top-level statements' is currently in Preview and *unsupported*. To use Preview features, use the 'preview' language version.
+                // (2,1): error CS8107: Feature 'top-level statements' is not available in C# 7.0. Please use language version 9.0 or greater.
                 // string Test() => "1";
-                Diagnostic(ErrorCode.ERR_FeatureInPreview, @"string Test() => ""1"";").WithArguments("top-level statements").WithLocation(2, 1)
+                Diagnostic(ErrorCode.ERR_FeatureNotAvailableInVersion7, @"string Test() => ""1"";").WithArguments("top-level statements", "9.0").WithLocation(2, 1)
                 );
         }
 
@@ -5283,7 +5285,10 @@ class Program2
 
             comp.VerifyEmitDiagnostics(
                 // error CS8804: Cannot specify /main if there is a compilation unit with top-level statements.
-                Diagnostic(ErrorCode.ERR_SimpleProgramDisallowsMainType).WithLocation(1, 1)
+                Diagnostic(ErrorCode.ERR_SimpleProgramDisallowsMainType).WithLocation(1, 1),
+                // (12,23): warning CS8892: Method 'Program.Main(string[])' will not be used as an entry point because a synchronous entry point 'Program.Main()' was found.
+                //     static async Task Main(string[] args)
+                Diagnostic(ErrorCode.WRN_SyncAndAsyncEntryPoints, "Main").WithArguments("Program.Main(string[])", "Program.Main()").WithLocation(12, 23)
                 );
         }
 
@@ -8601,6 +8606,79 @@ for (Span<int> inner = stackalloc int[10];; inner = outer)
                 //     outer = inner;
                 Diagnostic(ErrorCode.ERR_EscapeLocal, "inner").WithArguments("inner").WithLocation(7, 13)
                 );
+        }
+
+        [Fact]
+        [WorkItem(1179569, "https://devdiv.visualstudio.com/DevDiv/_workitems/edit/1179569")]
+        public void Issue1179569()
+        {
+            var text1 =
+@"Task v0123456789012345678901234567()
+{
+    Console.Write(""start v0123456789012345678901234567"");
+    await Task.Delay(2 * 1000);
+    Console.Write(""end v0123456789012345678901234567"");
+}
+
+Task On01234567890123456()
+{
+    return v0123456789012345678901234567();
+}
+
+string
+
+return Task.WhenAll(
+    Task.WhenAll(this.c01234567890123456789012345678.Select(v01234567 => On01234567890123456(v01234567))),
+    Task.WhenAll(this.c01234567890123456789.Select(v01234567 => v01234567.U0123456789012345678901234())));
+";
+
+            var oldTree = Parse(text: text1, options: TestOptions.RegularDefault);
+
+            var text2 =
+@"Task v0123456789012345678901234567()
+{
+    Console.Write(""start v0123456789012345678901234567"");
+    await Task.Delay(2 * 1000);
+    Console.Write(""end v0123456789012345678901234567"");
+}
+
+Task On01234567890123456()
+{
+    return v0123456789012345678901234567();
+}
+
+string[
+
+return Task.WhenAll(
+    Task.WhenAll(this.c01234567890123456789012345678.Select(v01234567 => On01234567890123456(v01234567))),
+    Task.WhenAll(this.c01234567890123456789.Select(v01234567 => v01234567.U0123456789012345678901234())));
+";
+
+            var newText = Microsoft.CodeAnalysis.Text.StringText.From(text2, System.Text.Encoding.UTF8);
+            using var lexer = new Microsoft.CodeAnalysis.CSharp.Syntax.InternalSyntax.Lexer(newText, TestOptions.RegularDefault);
+            using var parser = new Microsoft.CodeAnalysis.CSharp.Syntax.InternalSyntax.LanguageParser(lexer,
+                                       (CSharpSyntaxNode)oldTree.GetRoot(), new[] { new Microsoft.CodeAnalysis.Text.TextChangeRange(new Microsoft.CodeAnalysis.Text.TextSpan(282, 0), 1) });
+
+            var compilationUnit = (CompilationUnitSyntax)parser.ParseCompilationUnit().CreateRed();
+            var tree = CSharpSyntaxTree.Create(compilationUnit, TestOptions.RegularDefault, encoding: System.Text.Encoding.UTF8);
+            Assert.Equal(text2, tree.GetText().ToString());
+            tree.VerifySource();
+
+            var fullParseTree = Parse(text: text2, options: TestOptions.RegularDefault);
+            var nodes1 = tree.GetRoot().DescendantNodesAndTokensAndSelf(descendIntoTrivia: true).ToArray();
+            var nodes2 = fullParseTree.GetRoot().DescendantNodesAndTokensAndSelf(descendIntoTrivia: true).ToArray();
+            Assert.Equal(nodes1.Length, nodes2.Length);
+
+            for (int i = 0; i < nodes1.Length; i++)
+            {
+                var node1 = nodes1[i];
+                var node2 = nodes2[i];
+                Assert.Equal(node1.RawKind, node2.RawKind);
+                Assert.Equal(node1.Span, node2.Span);
+                Assert.Equal(node1.FullSpan, node2.FullSpan);
+                Assert.Equal(node1.ToString(), node2.ToString());
+                Assert.Equal(node1.ToFullString(), node2.ToFullString());
+            }
         }
     }
 }

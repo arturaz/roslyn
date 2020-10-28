@@ -2,7 +2,10 @@
 // The .NET Foundation licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
+#nullable disable
+
 using Microsoft.CodeAnalysis.CommandLine;
+using Microsoft.CodeAnalysis.Test.Utilities;
 using Roslyn.Test.Utilities;
 using System;
 using System.Collections.Generic;
@@ -17,8 +20,15 @@ using Xunit;
 
 namespace Microsoft.CodeAnalysis.CompilerServer.UnitTests
 {
-    public class VBCSCompilerServerTests
+    public class VBCSCompilerServerTests : IDisposable
     {
+        public TempRoot TempRoot { get; } = new TempRoot();
+
+        public void Dispose()
+        {
+            TempRoot.Dispose();
+        }
+
         public class StartupTests : VBCSCompilerServerTests
         {
             [Fact]
@@ -195,7 +205,7 @@ namespace Microsoft.CodeAnalysis.CompilerServer.UnitTests
                 await serverData.SendShutdownAsync().ConfigureAwait(false);
                 Assert.False(compileTask.IsCompleted);
 
-                // Now complete the compilation and verify that it actually ran to completion dispite
+                // Now complete the compilation and verify that it actually ran to completion despite
                 // there being a shutdown request.
                 finishedMre.Set();
                 var response = await compileTask.ConfigureAwait(false);
@@ -234,7 +244,7 @@ namespace Microsoft.CodeAnalysis.CompilerServer.UnitTests
                 await serverData.SendShutdownAsync().ConfigureAwait(false);
                 await serverData.SendShutdownAsync().ConfigureAwait(false);
 
-                // Now complete the compilation and verify that it actually ran to completion dispite
+                // Now complete the compilation and verify that it actually ran to completion despite
                 // there being a shutdown request.
                 finishedMre.Set();
                 var response = await compileTask.ConfigureAwait(false);
@@ -249,7 +259,7 @@ namespace Microsoft.CodeAnalysis.CompilerServer.UnitTests
         public class KeepAliveTests : VBCSCompilerServerTests
         {
             /// <summary>
-            /// Ensure server hits keep alive when processing no conections
+            /// Ensure server hits keep alive when processing no connections
             /// </summary>
             [Fact]
             public async Task NoConnections()
@@ -276,11 +286,12 @@ namespace Microsoft.CodeAnalysis.CompilerServer.UnitTests
             {
                 var compilerServerHost = new TestableCompilerServerHost((request, cancellationToken) => ProtocolUtil.EmptyBuildResponse);
                 using var serverData = await ServerUtil.CreateServer(compilerServerHost: compilerServerHost).ConfigureAwait(false);
+                var workingDirectory = TempRoot.CreateDirectory().Path;
 
                 for (var i = 0; i < connectionCount; i++)
                 {
                     var request = i + 1 >= connectionCount
-                        ? ProtocolUtil.CreateEmptyCSharpWithKeepAlive(TimeSpan.FromSeconds(3))
+                        ? ProtocolUtil.CreateEmptyCSharpWithKeepAlive(TimeSpan.FromSeconds(3), workingDirectory)
                         : ProtocolUtil.EmptyCSharpBuildRequest;
                     await serverData.SendAsync(request).ConfigureAwait(false);
                 }
@@ -298,7 +309,7 @@ namespace Microsoft.CodeAnalysis.CompilerServer.UnitTests
             [ConditionalTheory(typeof(WindowsOnly), Reason = "https://github.com/dotnet/roslyn/issues/46447")]
             [InlineData(2)]
             [InlineData(3)]
-            public async Task SimultaneousConnectons(int connectionCount)
+            public async Task SimultaneousConnections(int connectionCount)
             {
                 using var readyMre = new ManualResetEvent(initialState: false);
                 var compilerServerHost = new TestableCompilerServerHost((request, cancellationToken) =>
@@ -316,7 +327,8 @@ namespace Microsoft.CodeAnalysis.CompilerServer.UnitTests
 
                 readyMre.Set();
 
-                await serverData.SendAsync(ProtocolUtil.CreateEmptyCSharpWithKeepAlive(TimeSpan.FromSeconds(3))).ConfigureAwait(false);
+                var workingDirectory = TempRoot.CreateDirectory().Path;
+                await serverData.SendAsync(ProtocolUtil.CreateEmptyCSharpWithKeepAlive(TimeSpan.FromSeconds(3), workingDirectory)).ConfigureAwait(false);
                 await Task.WhenAll(list).ConfigureAwait(false);
 
                 // Don't use Complete here because we want to see the server shutdown naturally
@@ -327,16 +339,41 @@ namespace Microsoft.CodeAnalysis.CompilerServer.UnitTests
             }
         }
 
-        public class Misc : VBCSCompilerServerTests
+        public class MiscTests : VBCSCompilerServerTests
         {
             [Fact]
-            public async Task RequestErrorShouldShutdown()
+            public async Task CompilationExceptionShouldShutdown()
             {
-                var compilerServerHost = new TestableCompilerServerHost(delegate { throw new Exception(""); });
+                var hitCompilation = false;
+                var compilerServerHost = new TestableCompilerServerHost(delegate
+                {
+                    hitCompilation = true;
+                    throw new Exception("");
+                });
                 using var serverData = await ServerUtil.CreateServer(compilerServerHost: compilerServerHost).ConfigureAwait(false);
 
                 var response = await serverData.SendAsync(ProtocolUtil.EmptyBasicBuildRequest).ConfigureAwait(false);
                 Assert.True(response is RejectedBuildResponse);
+
+                // Don't use Complete here because we want to see the server shutdown naturally
+                var listener = await serverData.ServerTask.ConfigureAwait(false);
+                Assert.False(listener.KeepAliveHit);
+                Assert.Equal(CompletionData.RequestError, listener.CompletionDataList.Single());
+                Assert.True(hitCompilation);
+            }
+
+            [Fact]
+            public async Task AnalyzerInconsistencyShouldShutdown()
+            {
+                var compilerServerHost = new TestableCompilerServerHost(delegate
+                {
+                    return new AnalyzerInconsistencyBuildResponse();
+                });
+
+                using var serverData = await ServerUtil.CreateServer(compilerServerHost: compilerServerHost).ConfigureAwait(false);
+
+                var response = await serverData.SendAsync(ProtocolUtil.EmptyBasicBuildRequest).ConfigureAwait(false);
+                Assert.True(response is AnalyzerInconsistencyBuildResponse);
 
                 // Don't use Complete here because we want to see the server shutdown naturally
                 var listener = await serverData.ServerTask.ConfigureAwait(false);

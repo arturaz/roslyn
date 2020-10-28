@@ -2,6 +2,8 @@
 // The .NET Foundation licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
+#nullable disable
+
 using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
@@ -10,6 +12,7 @@ using System.Threading.Tasks;
 using Microsoft.CodeAnalysis.ChangeSignature;
 using Microsoft.CodeAnalysis.Editor.UnitTests.CodeActions;
 using Microsoft.CodeAnalysis.Notification;
+using Microsoft.CodeAnalysis.Options;
 using Microsoft.CodeAnalysis.Test.Utilities;
 using Microsoft.CodeAnalysis.Test.Utilities.ChangeSignature;
 using Microsoft.CodeAnalysis.Text;
@@ -20,14 +23,11 @@ namespace Microsoft.CodeAnalysis.Editor.UnitTests.ChangeSignature
 {
     public abstract class AbstractChangeSignatureTests : AbstractCodeActionTest
     {
-        private static readonly TestComposition s_composition = EditorTestCompositions.EditorFeatures.AddParts(
-            typeof(TestChangeSignatureOptionsService));
-
         protected override ParseOptions GetScriptOptions()
             => throw new NotSupportedException();
 
         protected override TestComposition GetComposition()
-            => s_composition;
+            => base.GetComposition().AddParts(typeof(TestChangeSignatureOptionsService));
 
         internal async Task TestChangeSignatureViaCodeActionAsync(
             string markup,
@@ -78,6 +78,7 @@ namespace Microsoft.CodeAnalysis.Editor.UnitTests.ChangeSignature
             int? totalParameters = null,
             bool verifyNoDiagnostics = false,
             ParseOptions parseOptions = null,
+            OptionsCollection options = null,
             int expectedSelectedIndex = -1)
             => await TestChangeSignatureViaCommandAsync(languageName, markup,
                 updatedSignature?.Select(i => new AddedParameterOrExistingIndex(i)).ToArray(),
@@ -86,6 +87,7 @@ namespace Microsoft.CodeAnalysis.Editor.UnitTests.ChangeSignature
                 totalParameters,
                 verifyNoDiagnostics,
                 parseOptions,
+                options,
                 expectedSelectedIndex);
 
         internal static async Task TestChangeSignatureViaCommandAsync(
@@ -98,9 +100,10 @@ namespace Microsoft.CodeAnalysis.Editor.UnitTests.ChangeSignature
             int? totalParameters = null,
             bool verifyNoDiagnostics = false,
             ParseOptions parseOptions = null,
+            OptionsCollection options = null,
             int expectedSelectedIndex = -1)
         {
-            using (var testState = ChangeSignatureTestState.Create(markup, languageName, parseOptions))
+            using (var testState = ChangeSignatureTestState.Create(markup, languageName, parseOptions, options))
             {
                 testState.TestChangeSignatureOptionsService.UpdatedSignature = updatedSignature;
                 var result = testState.ChangeSignature();

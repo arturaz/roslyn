@@ -2,6 +2,8 @@
 // The .NET Foundation licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
+#nullable disable
+
 using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
@@ -551,6 +553,25 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols.Metadata.PE
             get
             {
                 return _container as NamedTypeSymbol;
+            }
+        }
+
+        internal override bool IsRecord
+        {
+            get
+            {
+                // First, do a check to see if there are even any members named <Clone>$. If we have to actually find the clone
+                // method, it can be expensive, because we have to load all the members. MemberNames just loads the strings, which
+                // is much cheaper.
+                if (!MemberNames.Contains(WellKnownMemberNames.CloneMethodName))
+                {
+                    return false;
+                }
+
+                // There exists a member named <Clone>$. We still need to check to see if it's actually a valid clone method, but
+                // there's no getting around that now.
+                HashSet<DiagnosticInfo> useSiteDiagnostics = null;
+                return SynthesizedRecordClone.FindValidCloneMethod(this, ref useSiteDiagnostics) != null;
             }
         }
 
@@ -2396,7 +2417,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols.Metadata.PE
                 }
             }
 
-            override internal int MetadataArity
+            internal override int MetadataArity
             {
                 get
                 {

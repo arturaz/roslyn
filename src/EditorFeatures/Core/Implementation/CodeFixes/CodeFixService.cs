@@ -2,8 +2,6 @@
 // The .NET Foundation licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
-#nullable enable
-
 using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
@@ -38,7 +36,7 @@ namespace Microsoft.CodeAnalysis.CodeFixes
     internal partial class CodeFixService : ForegroundThreadAffinitizedObject, ICodeFixService
     {
         private static readonly Comparison<DiagnosticData> s_diagnosticDataComparisonById =
-            new Comparison<DiagnosticData>((d1, d2) => DiagnosticId.CompareOrdinal(d1.Id, d2.Id));
+            new((d1, d2) => DiagnosticId.CompareOrdinal(d1.Id, d2.Id));
 
         private readonly IDiagnosticAnalyzerService _diagnosticService;
 
@@ -58,7 +56,7 @@ namespace Microsoft.CodeAnalysis.CodeFixes
         private readonly ImmutableDictionary<LanguageKind, Lazy<ImmutableArray<IConfigurationFixProvider>>> _configurationProvidersMap;
         private readonly IEnumerable<Lazy<IErrorLoggerService>> _errorLoggers;
 
-        private ImmutableDictionary<object, FixAllProviderInfo> _fixAllProviderMap;
+        private ImmutableDictionary<object, FixAllProviderInfo?> _fixAllProviderMap;
 
         [ImportingConstructor]
         [SuppressMessage("RoslynDiagnosticsReliability", "RS0033:Importing constructor should be [Obsolete]", Justification = "Used in test code: https://github.com/dotnet/roslyn/issues/42814")]
@@ -85,7 +83,7 @@ namespace Microsoft.CodeAnalysis.CodeFixes
             _projectFixersMap = new ConditionalWeakTable<IReadOnlyList<AnalyzerReference>, ImmutableDictionary<string, List<CodeFixProvider>>>();
             _analyzerReferenceToFixersMap = new ConditionalWeakTable<AnalyzerReference, ProjectCodeFixProvider>();
             _createProjectCodeFixProvider = new ConditionalWeakTable<AnalyzerReference, ProjectCodeFixProvider>.CreateValueCallback(r => new ProjectCodeFixProvider(r));
-            _fixAllProviderMap = ImmutableDictionary<object, FixAllProviderInfo>.Empty;
+            _fixAllProviderMap = ImmutableDictionary<object, FixAllProviderInfo?>.Empty;
         }
 
         public async Task<FirstDiagnosticResult> GetMostSevereFixableDiagnosticAsync(
@@ -312,7 +310,7 @@ namespace Microsoft.CodeAnalysis.CodeFixes
                         ? string.Format(EditorFeaturesResources.Error_creating_instance_of_CodeFixProvider_0, lazyFixer.Metadata.Name)
                         : EditorFeaturesResources.Error_creating_instance_of_CodeFixProvider;
 
-                    errorReportingService.ShowErrorInfoInActiveView(
+                    errorReportingService.ShowGlobalErrorInfo(
                         message,
                         new InfoBarUI(
                             WorkspacesResources.Show_Stack_Trace,
@@ -743,26 +741,8 @@ namespace Microsoft.CodeAnalysis.CodeFixes
             foreach (var fixer in allFixers)
             {
                 await extensionManager.PerformActionAsync(fixer, () => fixer.RegisterCodeFixesAsync(context) ?? Task.CompletedTask).ConfigureAwait(false);
-                foreach (var fix in fixes)
-                {
-                    if (!fix.Action.PerformFinalApplicabilityCheck)
-                    {
-                        return true;
-                    }
-
-                    // Have to see if this fix is still applicable.  Jump to the foreground thread
-                    // to make that check.
-                    await ThreadingContext.JoinableTaskFactory.SwitchToMainThreadAsync(alwaysYield: true, cancellationToken);
-
-                    var applicable = fix.Action.IsApplicable(document.Project.Solution.Workspace);
-
-                    await TaskScheduler.Default;
-
-                    if (applicable)
-                    {
-                        return true;
-                    }
-                }
+                if (fixes.Count > 0)
+                    return true;
             }
 
             return false;

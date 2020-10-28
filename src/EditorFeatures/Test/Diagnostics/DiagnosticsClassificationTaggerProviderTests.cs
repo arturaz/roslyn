@@ -2,8 +2,6 @@
 // The .NET Foundation licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
-#nullable enable
-
 using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
@@ -59,12 +57,6 @@ namespace Microsoft.CodeAnalysis.Editor.UnitTests.Diagnostics
 
         private class Analyzer : DiagnosticAnalyzer
         {
-            // Mark elements 1, and 2 in the locations as the fading locations.
-            private static readonly ImmutableDictionary<string, IEnumerable<int>> s_fadeLocations = new Dictionary<string, IEnumerable<int>>
-            {
-                { nameof(WellKnownDiagnosticTags.Unnecessary), new int[] { 1, 2 } },
-            }.ToImmutableDictionary();
-
             private readonly DiagnosticDescriptor _rule = new DiagnosticDescriptor(
                 "test", "test", "test", "test", DiagnosticSeverity.Error, true,
                 customTags: DiagnosticCustomTags.Create(isUnnecessary: true, isConfigurable: false));
@@ -76,15 +68,16 @@ namespace Microsoft.CodeAnalysis.Editor.UnitTests.Diagnostics
             {
                 context.RegisterSyntaxTreeAction(c =>
                 {
+                    var additionalLocations = ImmutableArray.Create(Location.Create(c.Tree, new TextSpan(0, 10)));
+                    var additionalUnnecessaryLocations = ImmutableArray.Create(
+                        Location.Create(c.Tree, new TextSpan(0, 1)),
+                        Location.Create(c.Tree, new TextSpan(9, 1)));
+
                     c.ReportDiagnostic(DiagnosticHelper.CreateWithLocationTags(
                         _rule, Location.Create(c.Tree, new TextSpan(0, 10)),
                         ReportDiagnostic.Error,
-                        new Location[] {
-                            Location.Create(c.Tree, new TextSpan(0, 10)),
-                            Location.Create(c.Tree, new TextSpan(0, 1)),
-                            Location.Create(c.Tree, new TextSpan(9, 1)),
-                        },
-                        s_fadeLocations));
+                        additionalLocations,
+                        additionalUnnecessaryLocations));
                 });
             }
         }

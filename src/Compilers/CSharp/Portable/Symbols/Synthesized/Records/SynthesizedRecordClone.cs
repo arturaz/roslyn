@@ -2,14 +2,9 @@
 // The .NET Foundation licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
-#nullable enable
-
-using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Diagnostics;
-using System.Reflection;
-using Microsoft.Cci;
 using Roslyn.Utilities;
 
 namespace Microsoft.CodeAnalysis.CSharp.Symbols
@@ -147,20 +142,24 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
             }
         }
 
-        // Note: this method was replicated in SymbolDisplayVisitor.FindValidCloneMethod
         internal static MethodSymbol? FindValidCloneMethod(TypeSymbol containingType, ref HashSet<DiagnosticInfo>? useSiteDiagnostics)
         {
+            if (containingType.IsObjectType())
+            {
+                return null;
+            }
+
             MethodSymbol? candidate = null;
 
             foreach (var member in containingType.GetMembers(WellKnownMemberNames.CloneMethodName))
             {
                 if (member is MethodSymbol
-                {
-                    DeclaredAccessibility: Accessibility.Public,
-                    IsStatic: false,
-                    ParameterCount: 0,
-                    Arity: 0
-                } method)
+                    {
+                        DeclaredAccessibility: Accessibility.Public,
+                        IsStatic: false,
+                        ParameterCount: 0,
+                        Arity: 0
+                    } method)
                 {
                     if (candidate is object)
                     {

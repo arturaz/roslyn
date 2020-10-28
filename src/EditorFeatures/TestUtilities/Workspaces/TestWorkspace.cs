@@ -2,18 +2,18 @@
 // The .NET Foundation licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
-#nullable enable
-
 using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
 using System.Threading;
-using System.Windows.Threading;
+using System.Threading.Tasks;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Editor.Shared.Extensions;
+using Microsoft.CodeAnalysis.Editor.Shared.Utilities;
 using Microsoft.CodeAnalysis.Formatting;
 using Microsoft.CodeAnalysis.Host;
+using Microsoft.CodeAnalysis.Host.Mef;
 using Microsoft.CodeAnalysis.MetadataAsSource;
 using Microsoft.CodeAnalysis.Notification;
 using Microsoft.CodeAnalysis.Options;
@@ -21,7 +21,6 @@ using Microsoft.CodeAnalysis.Test.Utilities;
 using Microsoft.CodeAnalysis.Text;
 using Microsoft.CodeAnalysis.Text.Shared.Extensions;
 using Microsoft.VisualStudio.Composition;
-using Microsoft.VisualStudio.LanguageServices;
 using Microsoft.VisualStudio.Text;
 using Microsoft.VisualStudio.Text.Editor;
 using Microsoft.VisualStudio.Text.Projection;
@@ -156,11 +155,6 @@ namespace Microsoft.CodeAnalysis.Editor.UnitTests.Workspaces
             foreach (var document in ProjectionDocuments)
             {
                 document.CloseTextView();
-            }
-
-            if (SynchronizationContext.Current != null)
-            {
-                Dispatcher.CurrentDispatcher.DoEvents();
             }
 
             if (_backgroundParser != null)
@@ -706,6 +700,15 @@ namespace Microsoft.CodeAnalysis.Editor.UnitTests.Workspaces
 
         public override bool CanApplyParseOptionChange(ParseOptions oldOptions, ParseOptions newOptions, Project project)
             => true;
+
+        internal override async Task<bool> CanAddProjectReferenceAsync(ProjectId referencingProject, ProjectId referencedProject, CancellationToken cancellationToken)
+        {
+            // VisualStudioWorkspace switches to the main thread for this call, so do the same thing here to catch tests
+            // that fail to account for this possibility.
+            var threadingContext = ExportProvider.GetExportedValue<IThreadingContext>();
+            await threadingContext.JoinableTaskFactory.SwitchToMainThreadAsync(alwaysYield: true, cancellationToken);
+            return true;
+        }
 
         internal ITextBuffer GetOrCreateBufferForPath(string? filePath, IContentType contentType, string languageName, string initialText)
         {

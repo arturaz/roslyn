@@ -2,6 +2,8 @@
 // The .NET Foundation licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
+#nullable disable
+
 extern alias WORKSPACES;
 
 using System;
@@ -79,11 +81,34 @@ namespace Microsoft.CodeAnalysis.Editor.UnitTests.Workspaces
             bool ignoreUnchangeableDocumentsWhenApplyingChanges = true)
         {
             var workspace = new TestWorkspace(exportProvider, composition, workspaceKind, ignoreUnchangeableDocumentsWhenApplyingChanges: ignoreUnchangeableDocumentsWhenApplyingChanges);
-            workspace.InitializeFromXml(workspaceElement, openDocuments, documentServiceProvider);
+            workspace.InitializeDocuments(workspaceElement, openDocuments, documentServiceProvider);
             return workspace;
         }
 
-        internal void InitializeFromXml(
+        internal void InitializeDocuments(
+            string language,
+            CompilationOptions compilationOptions = null,
+            ParseOptions parseOptions = null,
+            string[] files = null,
+            string[] metadataReferences = null,
+            string extension = null,
+            bool commonReferences = true,
+            bool openDocuments = true,
+            IDocumentServiceProvider documentServiceProvider = null)
+        {
+            var workspaceElement = CreateWorkspaceElement(
+                language,
+                compilationOptions,
+                parseOptions,
+                files,
+                metadataReferences,
+                extension,
+                commonReferences);
+
+            InitializeDocuments(workspaceElement, openDocuments, documentServiceProvider);
+        }
+
+        internal void InitializeDocuments(
             XElement workspaceElement,
             bool openDocuments = true,
             IDocumentServiceProvider documentServiceProvider = null)
@@ -424,16 +449,21 @@ namespace Microsoft.CodeAnalysis.Editor.UnitTests.Workspaces
         {
             if (language == LanguageNames.CSharp)
             {
-                var languageVersion = (CodeAnalysis.CSharp.LanguageVersion)Enum.Parse(typeof(CodeAnalysis.CSharp.LanguageVersion), languageVersionAttribute.Value);
-                parseOptions = ((CSharpParseOptions)parseOptions).WithLanguageVersion(languageVersion);
+                if (CodeAnalysis.CSharp.LanguageVersionFacts.TryParse(languageVersionAttribute.Value, out var languageVersion))
+                {
+                    return ((CSharpParseOptions)parseOptions).WithLanguageVersion(languageVersion);
+                }
             }
             else if (language == LanguageNames.VisualBasic)
             {
-                var languageVersion = (CodeAnalysis.VisualBasic.LanguageVersion)Enum.Parse(typeof(CodeAnalysis.VisualBasic.LanguageVersion), languageVersionAttribute.Value);
-                parseOptions = ((VisualBasicParseOptions)parseOptions).WithLanguageVersion(languageVersion);
+                var languageVersion = CodeAnalysis.VisualBasic.LanguageVersion.Default;
+                if (CodeAnalysis.VisualBasic.LanguageVersionFacts.TryParse(languageVersionAttribute.Value, ref languageVersion))
+                {
+                    return ((VisualBasicParseOptions)parseOptions).WithLanguageVersion(languageVersion);
+                }
             }
 
-            return parseOptions;
+            throw new Exception($"LanguageVersion attribute on {languageVersionAttribute.Parent} was not recognized.");
         }
 
         private static DocumentationMode? GetDocumentationMode(XElement projectElement)
@@ -801,7 +831,7 @@ namespace Microsoft.CodeAnalysis.Editor.UnitTests.Workspaces
                 supportDiagnostics ?? true);
         }
 
-#nullable restore
+#nullable disable
 
         private static string GetFilePath(
             TestWorkspace workspace,

@@ -11,9 +11,6 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.CodeAnalysis.CommandLine;
 using System.IO.Pipes;
-
-#nullable enable
-
 namespace Microsoft.CodeAnalysis.CompilerServer
 {
     internal enum CompletionReason
@@ -50,6 +47,8 @@ namespace Microsoft.CodeAnalysis.CompilerServer
         internal static CompletionData RequestCompleted { get; } = new CompletionData(CompletionReason.RequestCompleted);
 
         internal static CompletionData RequestError { get; } = new CompletionData(CompletionReason.RequestError);
+
+        public override string ToString() => $"{Reason} KeepAlive:{NewKeepAlive} ShutdownRequest:{ShutdownRequest}";
     }
 }
 
