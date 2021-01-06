@@ -812,7 +812,7 @@ namespace Microsoft.CodeAnalysis
             }
 
             RunCompilationExtensions(ref compilation, diagnostics, Arguments.BaseDirectory ?? "");
-            if (ReportDiagnostics(diagnostics, consoleOutput, errorLogger)) return Failed;
+            if (ReportDiagnostics(diagnostics, consoleOutput, errorLogger, compilation)) return Failed;
 
             var additionalTexts = ImmutableArray<AdditionalText>.CastUp(additionalTextFiles);
             CompileAndEmit(
