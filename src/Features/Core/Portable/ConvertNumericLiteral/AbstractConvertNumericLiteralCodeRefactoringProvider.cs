@@ -2,6 +2,8 @@
 // The .NET Foundation licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
+#nullable disable
+
 using System;
 using System.Text.RegularExpressions;
 using System.Threading;
@@ -12,7 +14,6 @@ using Microsoft.CodeAnalysis.Editing;
 using Microsoft.CodeAnalysis.LanguageServices;
 using Microsoft.CodeAnalysis.Shared.Extensions;
 using Microsoft.CodeAnalysis.Shared.Utilities;
-using Microsoft.CodeAnalysis.Text;
 
 namespace Microsoft.CodeAnalysis.ConvertNumericLiteral
 {
@@ -146,7 +147,7 @@ namespace Microsoft.CodeAnalysis.ConvertNumericLiteral
             // Insert digit separators in the given interval.
             var result = Regex.Replace(numericText, $"(.{{{interval}}})", "_$1", RegexOptions.RightToLeft);
             // Fix for the case "0x_1111" that is not supported yet.
-            return result[0] == '_' ? result.Substring(1) : result;
+            return result[0] == '_' ? result[1..] : result;
         }
 
         private static bool IsIntegral(SpecialType specialType)

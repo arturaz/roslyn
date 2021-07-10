@@ -38,9 +38,10 @@ namespace Microsoft.CodeAnalysis.Editor.Implementation.EditAndContinue
                 if (encService != null)
                 {
                     var documentId = workspace.GetDocumentIdInCurrentContext(textContainer);
-                    if (documentId != null)
+                    var currentDocument = workspace.CurrentSolution.GetDocument(documentId);
+                    if (currentDocument != null)
                     {
-                        encService.OnSourceFileUpdated(documentId);
+                        encService.OnSourceFileUpdated(currentDocument);
                     }
                 }
             }
@@ -52,5 +53,4 @@ namespace Microsoft.CodeAnalysis.Editor.Implementation.EditAndContinue
             => nextCommandHandler();
     }
 }
-
 

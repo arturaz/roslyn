@@ -147,6 +147,9 @@
   <data name="Parameter_preferences" xml:space="preserve">
     <value>Parameter preferences</value>
   </data>
+  <data name="Suppression_preferences" xml:space="preserve">
+    <value>Suppression preferences</value>
+  </data>
   <data name="Pascal_Case" xml:space="preserve">
     <value>Pascal Case</value>
   </data>
@@ -257,5 +260,20 @@
   </data>
   <data name="Cast_is_redundant" xml:space="preserve">
     <value>Cast is redundant.</value>
+  </data>
+  <data name="Naming_styles" xml:space="preserve">
+    <value>Naming styles</value>
+  </data>
+  <data name="Naming_rules" xml:space="preserve">
+    <value>Naming rules</value>
+  </data>
+  <data name="Symbol_specifications" xml:space="preserve">
+    <value>Symbol specifications</value>
+  </data>
+  <data name="Specified_sequence_has_duplicate_items" xml:space="preserve">
+    <value>Specified sequence has duplicate items</value>
+  </data>
+  <data name="Segment_size_must_be_power_of_2_greater_than_1" xml:space="preserve">
+    <value>Segment size must be power of 2 greater than 1</value>
   </data>
 </root>

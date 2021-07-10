@@ -2,6 +2,8 @@
 // The .NET Foundation licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
+#nullable disable
+
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -88,7 +90,7 @@ namespace Microsoft.CodeAnalysis.SignatureHelp
 
         public static explicit operator SignatureHelpParameter(SignatureHelpSymbolParameter parameter)
         {
-            return new SignatureHelp.SignatureHelpParameter(
+            return new SignatureHelpParameter(
                 parameter.Name, parameter.IsOptional, parameter.DocumentationFactory,
                 parameter.DisplayParts.ToTaggedText(),
                 parameter.PrefixDisplayParts.ToTaggedText(),
@@ -151,7 +153,7 @@ namespace Microsoft.CodeAnalysis.SignatureHelp
             IEnumerable<SymbolDisplayPart> suffixDisplayParts = null,
             IEnumerable<SymbolDisplayPart> selectedDisplayParts = null)
             : this(name, isOptional,
-                  c => documentationFactory(c).ToTaggedText(),
+                  documentationFactory is null ? null : c => documentationFactory(c).ToTaggedText(),
                   displayParts.ToTaggedText(),
                   prefixDisplayParts.ToTaggedText(),
                   suffixDisplayParts.ToTaggedText(),

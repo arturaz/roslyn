@@ -2,6 +2,8 @@
 // The .NET Foundation licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
+#nullable disable
+
 using System;
 using System.Collections.Generic;
 using System.ComponentModel.Composition;
@@ -38,6 +40,9 @@ namespace Microsoft.CodeAnalysis.Editor.CommandHandlers
     [ContentType(ContentTypeNames.RoslynContentType)]
     [Name(PredefinedCommandHandlerNames.SignatureHelpBeforeCompletion)]
     [Order(Before = PredefinedCompletionNames.CompletionCommandHandler)]
+    // Ensure roslyn comes after LSP to allow them to provide results.
+    // https://github.com/dotnet/roslyn/issues/42338
+    [Order(After = "LSP SignatureHelpCommandHandler")]
     internal class SignatureHelpBeforeCompletionCommandHandler :
         AbstractSignatureHelpCommandHandler,
         IChainedCommandHandler<TypeCharCommandArgs>,

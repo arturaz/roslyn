@@ -2,37 +2,32 @@
 ' The .NET Foundation licenses this file to you under the MIT license.
 ' See the LICENSE file in the project root for more information.
 
-#If CODE_STYLE Then
-Imports Microsoft.CodeAnalysis.Internal.Options
-Imports Microsoft.CodeAnalysis.VisualBasic.Internal.CodeStyle
-#Else
 Imports Microsoft.CodeAnalysis.CodeStyle
-Imports Microsoft.CodeAnalysis.Options
+Imports Microsoft.CodeAnalysis.Editor.UnitTests.CodeActions
 Imports Microsoft.CodeAnalysis.VisualBasic.CodeStyle
-#End If
 
 Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.RemoveUnusedParametersAndValues
     Partial Public Class RemoveUnusedValueAssignmentTests
         Inherits RemoveUnusedValuesTestsBase
 
-        Protected Overrides ReadOnly Property PreferNone As IDictionary(Of OptionKey, Object)
+        Private Protected Overrides ReadOnly Property PreferNone As OptionsCollection
             Get
                 Return [Option](VisualBasicCodeStyleOptions.UnusedValueAssignment,
-                                New CodeStyleOption(Of UnusedValuePreference)(UnusedValuePreference.UnusedLocalVariable, NotificationOption.None))
+                                New CodeStyleOption2(Of UnusedValuePreference)(UnusedValuePreference.UnusedLocalVariable, NotificationOption2.None))
             End Get
         End Property
 
-        Protected Overrides ReadOnly Property PreferDiscard As IDictionary(Of OptionKey, Object)
+        Private Protected Overrides ReadOnly Property PreferDiscard As OptionsCollection
             Get
                 Return [Option](VisualBasicCodeStyleOptions.UnusedValueAssignment,
-                                New CodeStyleOption(Of UnusedValuePreference)(UnusedValuePreference.DiscardVariable, NotificationOption.Suggestion))
+                                New CodeStyleOption2(Of UnusedValuePreference)(UnusedValuePreference.DiscardVariable, NotificationOption2.Suggestion))
             End Get
         End Property
 
-        Protected Overrides ReadOnly Property PreferUnusedLocal As IDictionary(Of OptionKey, Object)
+        Private Protected Overrides ReadOnly Property PreferUnusedLocal As OptionsCollection
             Get
                 Return [Option](VisualBasicCodeStyleOptions.UnusedValueAssignment,
-                                New CodeStyleOption(Of UnusedValuePreference)(UnusedValuePreference.UnusedLocalVariable, NotificationOption.Suggestion))
+                                New CodeStyleOption2(Of UnusedValuePreference)(UnusedValuePreference.UnusedLocalVariable, NotificationOption2.Suggestion))
             End Get
         End Property
 
@@ -100,6 +95,39 @@ $"Class C
         Return x
     End Function
 End Class")
+        End Function
+
+        <WorkItem(48070, "https://github.com/dotnet/roslyn/issues/48070")>
+        <Fact, Trait(Traits.Feature, Traits.Features.CodeActionsRemoveUnusedValues)>
+        Public Async Function Initialization_ConstantValue_DoNotCopyLeadingTriviaDirectives() As Task
+            Await TestInRegularAndScriptAsync(
+"class C
+    sub M()
+#region """"
+
+        dim value as integer = 3
+
+#end region
+        dim [|x|] as integer? = nothing
+        dim y = value + value
+
+        x = y
+        System.Console.WriteLine(x)
+    end sub
+end class",
+"class C
+    sub M()
+#region """"
+
+        dim value as integer = 3
+
+#end region
+        dim y = value + value
+
+        Dim x As Integer? = y
+        System.Console.WriteLine(x)
+    end sub
+end class")
         End Function
 
         <Fact, Trait(Traits.Feature, Traits.Features.CodeActionsRemoveUnusedValues)>

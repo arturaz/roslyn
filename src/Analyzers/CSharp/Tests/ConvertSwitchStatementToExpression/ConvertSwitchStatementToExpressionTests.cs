@@ -4,31 +4,30 @@
 
 using System.Linq;
 using System.Threading.Tasks;
+using Microsoft.CodeAnalysis.CodeStyle;
+using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.CSharp.CodeStyle;
 using Microsoft.CodeAnalysis.CSharp.ConvertSwitchStatementToExpression;
 using Microsoft.CodeAnalysis.Diagnostics;
+using Microsoft.CodeAnalysis.Editor.UnitTests.CodeActions;
 using Microsoft.CodeAnalysis.Test.Utilities;
 using Microsoft.CodeAnalysis.Testing;
 using Roslyn.Test.Utilities;
 using Xunit;
-using VerifyCS = Microsoft.CodeAnalysis.Editor.UnitTests.CodeActions.CSharpCodeFixVerifier<
-    Microsoft.CodeAnalysis.CSharp.ConvertSwitchStatementToExpression.ConvertSwitchStatementToExpressionDiagnosticAnalyzer,
-    Microsoft.CodeAnalysis.CSharp.ConvertSwitchStatementToExpression.ConvertSwitchStatementToExpressionCodeFixProvider>;
-
-#if CODE_STYLE
-using Microsoft.CodeAnalysis.CSharp.Internal.CodeStyle;
-using Microsoft.CodeAnalysis.Internal.Options;
-#else
-using Microsoft.CodeAnalysis.CodeStyle;
-using Microsoft.CodeAnalysis.CSharp.CodeStyle;
-#endif
 
 namespace Microsoft.CodeAnalysis.Editor.CSharp.UnitTests.ConvertSwitchStatementToExpression
 {
+    using VerifyCS = CSharpCodeFixVerifier<
+        ConvertSwitchStatementToExpressionDiagnosticAnalyzer,
+        ConvertSwitchStatementToExpressionCodeFixProvider>;
+
     public class ConvertSwitchStatementToExpressionTests
     {
-        [Fact, Trait(Traits.Feature, Traits.Features.CodeActionsConvertSwitchStatementToExpression)]
-        public void TestStandardProperties()
-            => VerifyCS.VerifyStandardProperties();
+        private static readonly LanguageVersion CSharp9 = LanguageVersion.CSharp9;
+
+        [Theory, CombinatorialData, Trait(Traits.Feature, Traits.Features.CodeActionsConvertSwitchStatementToExpression)]
+        public void TestStandardProperty(AnalyzerProperty property)
+            => VerifyCS.VerifyStandardProperty(property);
 
         [Fact, Trait(Traits.Feature, Traits.Features.CodeActionsConvertSwitchStatementToExpression)]
         public async Task TestReturn()
@@ -535,7 +534,7 @@ class Program
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.CodeActionsConvertSwitchStatementToExpression)]
-        public async Task TestMissingONMultiCaseSection()
+        public async Task TestMissingOnMultiCaseSection()
         {
             var code = @"class Program
 {
@@ -554,6 +553,72 @@ class Program
 }";
 
             await VerifyCS.VerifyCodeFixAsync(code, code);
+        }
+
+        [Fact, Trait(Traits.Feature, Traits.Features.CodeActionsConvertSwitchStatementToExpression)]
+        public async Task TestMissingOnMultiCaseSectionWithWhenClause_CSharp9()
+        {
+            var code = @"class Program
+{
+    void M(int i)
+    {
+        int j;
+        switch (i)
+        {
+            case 1:
+            case 2 when true:
+                j = 4;
+                break;
+        }
+        throw null;
+    }
+}";
+
+            await new VerifyCS.Test
+            {
+                TestCode = code,
+                FixedCode = code,
+                LanguageVersion = CSharp9,
+            }.RunAsync();
+        }
+
+        [WorkItem(42368, "https://github.com/dotnet/roslyn/issues/42368")]
+        [Fact, Trait(Traits.Feature, Traits.Features.CodeActionsConvertSwitchStatementToExpression)]
+        public async Task TestOnMultiCaseSection_CSharp9()
+        {
+            var testCode = @"class Program
+{
+    void M(int i)
+    {
+        int j;
+        [|switch|] (i)
+        {
+            case 1:
+            case 2:
+                j = 4;
+                break;
+        }
+        throw null;
+    }
+}";
+            var fixedCode = @"class Program
+{
+    void M(int i)
+    {
+        var j = i switch
+        {
+            1 or 2 => 4,
+            _ => throw null,
+        };
+    }
+}";
+
+            await new VerifyCS.Test
+            {
+                TestCode = testCode,
+                FixedCode = fixedCode,
+                LanguageVersion = CSharp9,
+            }.RunAsync();
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.CodeActionsConvertSwitchStatementToExpression)]
@@ -729,7 +794,7 @@ class Program
                 },
                 Options =
                 {
-                    { CSharpCodeStyleOptions.PreferSwitchExpression, true, NotificationOption.Warning },
+                    { CSharpCodeStyleOptions.PreferSwitchExpression, true, NotificationOption2.Warning },
                 },
             }.RunAsync();
         }
@@ -1070,7 +1135,7 @@ class Program
                 FixedCode = expected,
                 Options =
                 {
-                    { CSharpCodeStyleOptions.VarElsewhere, true, NotificationOption.Silent },
+                    { CSharpCodeStyleOptions.VarElsewhere, true, NotificationOption2.Silent },
                 },
             }.RunAsync();
         }
@@ -1138,7 +1203,7 @@ class Program
                 FixedCode = expected,
                 Options =
                 {
-                    { CSharpCodeStyleOptions.VarElsewhere, true, NotificationOption.Silent },
+                    { CSharpCodeStyleOptions.VarElsewhere, true, NotificationOption2.Silent },
                 },
             }.RunAsync();
         }
@@ -1206,7 +1271,7 @@ class Program
                 FixedCode = expected,
                 Options =
                 {
-                    { CSharpCodeStyleOptions.VarElsewhere, true, NotificationOption.Silent },
+                    { CSharpCodeStyleOptions.VarElsewhere, true, NotificationOption2.Silent },
                 },
             }.RunAsync();
         }
@@ -1282,7 +1347,7 @@ class Program
                 FixedCode = expected,
                 Options =
                 {
-                    { CSharpCodeStyleOptions.VarElsewhere, true, NotificationOption.Silent },
+                    { CSharpCodeStyleOptions.VarElsewhere, true, NotificationOption2.Silent },
                 },
             }.RunAsync();
         }
@@ -1350,7 +1415,7 @@ class Program
                 FixedCode = expected,
                 Options =
                 {
-                    { CSharpCodeStyleOptions.VarElsewhere, true, NotificationOption.Silent },
+                    { CSharpCodeStyleOptions.VarElsewhere, true, NotificationOption2.Silent },
                 },
             }.RunAsync();
         }
@@ -1418,7 +1483,7 @@ class Program
                 FixedCode = expected,
                 Options =
                 {
-                    { CSharpCodeStyleOptions.VarElsewhere, true, NotificationOption.Silent },
+                    { CSharpCodeStyleOptions.VarElsewhere, true, NotificationOption2.Silent },
                 },
             }.RunAsync();
         }
@@ -1486,7 +1551,7 @@ class Program
                 FixedCode = expected,
                 Options =
                 {
-                    { CSharpCodeStyleOptions.VarElsewhere, true, NotificationOption.Silent },
+                    { CSharpCodeStyleOptions.VarElsewhere, true, NotificationOption2.Silent },
                 },
             }.RunAsync();
         }
@@ -1533,7 +1598,7 @@ class Program
                 FixedCode = expected,
                 Options =
                 {
-                    { CSharpCodeStyleOptions.VarForBuiltInTypes, true, NotificationOption.Silent },
+                    { CSharpCodeStyleOptions.VarForBuiltInTypes, true, NotificationOption2.Silent },
                 },
             }.RunAsync();
         }
@@ -1578,7 +1643,7 @@ class Program
                 FixedCode = expected,
                 Options =
                 {
-                    { CSharpCodeStyleOptions.VarForBuiltInTypes, true, NotificationOption.Silent },
+                    { CSharpCodeStyleOptions.VarForBuiltInTypes, true, NotificationOption2.Silent },
                 },
             }.RunAsync();
         }
@@ -1624,7 +1689,7 @@ class Program
                 FixedCode = expected,
                 Options =
                 {
-                    { CSharpCodeStyleOptions.VarForBuiltInTypes, true, NotificationOption.Silent },
+                    { CSharpCodeStyleOptions.VarForBuiltInTypes, true, NotificationOption2.Silent },
                 },
             }.RunAsync();
         }
@@ -1670,7 +1735,7 @@ class Program
                 FixedCode = expected,
                 Options =
                 {
-                    { CSharpCodeStyleOptions.VarForBuiltInTypes, false, NotificationOption.Silent },
+                    { CSharpCodeStyleOptions.VarForBuiltInTypes, false, NotificationOption2.Silent },
                 },
             }.RunAsync();
         }
@@ -1716,7 +1781,7 @@ class Program
                 FixedCode = expected,
                 Options =
                 {
-                    { CSharpCodeStyleOptions.VarForBuiltInTypes, true, NotificationOption.Silent },
+                    { CSharpCodeStyleOptions.VarForBuiltInTypes, true, NotificationOption2.Silent },
                 },
             }.RunAsync();
         }
@@ -1816,6 +1881,182 @@ class Program
         {
             0 => true ? ref mem[mem[addr]] : ref mem[mem[addr]],
             _ => throw new Exception(),
+        };
+    }
+}");
+        }
+
+        [Fact, Trait(Traits.Feature, Traits.Features.CodeActionsConvertSwitchStatementToExpression)]
+        public async Task TopLevelStatement()
+        {
+            var source = @"
+int i = 0;
+[|switch|] (i)
+{
+    case 1:
+        return 4;
+    default:
+        return 7;
+}";
+
+            var fixedSource = @"
+int i = 0;
+return i switch
+{
+    1 => 4,
+    _ => 7,
+};
+";
+
+            var test = new VerifyCS.Test
+            {
+                TestCode = source,
+                FixedCode = fixedSource,
+                LanguageVersion = LanguageVersion.CSharp9,
+            };
+
+            test.ExpectedDiagnostics.Add(
+                // error CS8805: Program using top-level statements must be an executable.
+                DiagnosticResult.CompilerError("CS8805"));
+
+            await test.RunAsync();
+        }
+
+        [WorkItem(44449, "https://github.com/dotnet/roslyn/issues/44449")]
+        [Fact, Trait(Traits.Feature, Traits.Features.CodeActionsConvertSwitchStatementToExpression)]
+        public async Task TopLevelStatement_FollowedWithThrow()
+        {
+            // We should be rewriting the declaration for 'j' to get 'var j = i switch ...'
+            var source = @"
+int i = 0;
+int j;
+[|switch|] (i)
+{
+    case 1:
+        j = 4;
+        break;
+    case 2:
+        j = 5;
+        break;
+}
+throw null;
+";
+
+            var fixedSource = @"
+int i = 0;
+int j;
+j = i switch
+{
+    1 => 4,
+    2 => 5,
+    _ => throw null,
+};
+";
+
+            var test = new VerifyCS.Test
+            {
+                TestCode = source,
+                FixedCode = fixedSource,
+                LanguageVersion = LanguageVersion.CSharp9,
+            };
+
+            test.ExpectedDiagnostics.Add(
+                // error CS8805: Program using top-level statements must be an executable.
+                DiagnosticResult.CompilerError("CS8805"));
+
+            await test.RunAsync();
+        }
+
+        [Fact, Trait(Traits.Feature, Traits.Features.CodeActionsConvertSwitchStatementToExpression)]
+        [WorkItem(48006, "https://github.com/dotnet/roslyn/issues/48006")]
+        public async Task TestOnMultiCaseSection_String_CSharp9()
+        {
+            var testCode = @"
+class Program
+{
+    bool M(string s)
+    {
+        [|switch|] (s)
+        {
+	        case ""Last"":
+            case ""First"":
+            case ""Count"":
+                return true;
+            default:
+                return false;
+        }
+    }
+}";
+            var fixedCode = @"
+class Program
+{
+    bool M(string s)
+    {
+        return s switch
+        {
+            ""Last"" or ""First"" or ""Count"" => true,
+            _ => false,
+        };
+    }
+}";
+
+            await new VerifyCS.Test
+            {
+                TestCode = testCode,
+                FixedCode = fixedCode,
+                LanguageVersion = CSharp9,
+            }.RunAsync();
+        }
+
+        [Fact, Trait(Traits.Feature, Traits.Features.CodeActionsConvertSwitchStatementToExpression)]
+        [WorkItem(49788, "https://github.com/dotnet/roslyn/issues/49788")]
+        public async Task TestParenthesizedExpression1()
+        {
+            await VerifyCS.VerifyCodeFixAsync(
+@"class Program
+{
+    int M(object i)
+    {
+        [|switch|] (i.GetType())
+        {
+            default: return 0;
+        }
+    }
+}",
+@"class Program
+{
+    int M(object i)
+    {
+        return i.GetType() switch
+        {
+            _ => 0,
+        };
+    }
+}");
+        }
+
+        [Fact, Trait(Traits.Feature, Traits.Features.CodeActionsConvertSwitchStatementToExpression)]
+        [WorkItem(49788, "https://github.com/dotnet/roslyn/issues/49788")]
+        public async Task TestParenthesizedExpression2()
+        {
+            await VerifyCS.VerifyCodeFixAsync(
+@"class Program
+{
+    int M()
+    {
+        [|switch|] (1 + 1)
+        {
+            default: return 0;
+        }
+    }
+}",
+@"class Program
+{
+    int M()
+    {
+        return (1 + 1) switch
+        {
+            _ => 0,
         };
     }
 }");

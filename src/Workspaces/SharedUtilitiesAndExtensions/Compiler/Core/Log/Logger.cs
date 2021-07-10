@@ -17,7 +17,7 @@ namespace Microsoft.CodeAnalysis.Internal.Log
     /// </summary>
     internal static partial class Logger
     {
-        private static ILogger s_currentLogger;
+        private static ILogger? s_currentLogger;
 
         /// <summary>
         /// next unique block id that will be given to each LogBlock
@@ -27,7 +27,7 @@ namespace Microsoft.CodeAnalysis.Internal.Log
         /// <summary>
         /// give a way to explicitly set/replace the logger
         /// </summary>
-        public static ILogger SetLogger(ILogger logger)
+        public static ILogger? SetLogger(ILogger logger)
         {
             // we don't care what was there already, just replace it explicitly
             return Interlocked.Exchange(ref Logger.s_currentLogger, logger);
@@ -36,15 +36,13 @@ namespace Microsoft.CodeAnalysis.Internal.Log
         /// <summary>
         /// ensure we have a logger by putting one from workspace service if one is not there already.
         /// </summary>
-        public static ILogger GetLogger()
-        {
-            return Logger.s_currentLogger;
-        }
+        public static ILogger? GetLogger()
+            => Logger.s_currentLogger;
 
         /// <summary>
         /// log a specific event with a simple context message which should be very cheap to create
         /// </summary>
-        public static void Log(FunctionId functionId, string message = null)
+        public static void Log(FunctionId functionId, string? message = null)
         {
             var logger = GetLogger();
             if (logger == null)
@@ -57,7 +55,7 @@ namespace Microsoft.CodeAnalysis.Internal.Log
                 return;
             }
 
-            logger.Log(functionId, LogMessage.Create(message));
+            logger.Log(functionId, LogMessage.Create(message ?? ""));
         }
 
         /// <summary>
@@ -195,22 +193,18 @@ namespace Microsoft.CodeAnalysis.Internal.Log
         /// return next unique pair id
         /// </summary>
         private static int GetNextUniqueBlockId()
-        {
-            return Interlocked.Increment(ref s_lastUniqueBlockId);
-        }
+            => Interlocked.Increment(ref s_lastUniqueBlockId);
 
         /// <summary>
         /// simplest way to log a start and end pair
         /// </summary>
         public static IDisposable LogBlock(FunctionId functionId, CancellationToken token)
-        {
-            return LogBlock(functionId, string.Empty, token);
-        }
+            => LogBlock(functionId, string.Empty, token);
 
         /// <summary>
         /// simplest way to log a start and end pair with a simple context message which should be very cheap to create
         /// </summary>
-        public static IDisposable LogBlock(FunctionId functionId, string message, CancellationToken token)
+        public static IDisposable LogBlock(FunctionId functionId, string? message, CancellationToken token)
         {
             var logger = GetLogger();
             if (logger == null)
@@ -223,7 +217,7 @@ namespace Microsoft.CodeAnalysis.Internal.Log
                 return EmptyLogBlock.Instance;
             }
 
-            return CreateLogBlock(functionId, LogMessage.Create(message), GetNextUniqueBlockId(), token);
+            return CreateLogBlock(functionId, LogMessage.Create(message ?? ""), GetNextUniqueBlockId(), token);
         }
 
         /// <summary>

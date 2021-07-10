@@ -2,7 +2,8 @@
 // The .NET Foundation licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
-using System;
+#nullable disable
+
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
@@ -53,7 +54,7 @@ namespace Microsoft.CodeAnalysis.Completion.Providers
             return symbols.WhereAsArray(s => inferredTypes.Contains(GetSymbolType(s), SymbolEqualityComparer.Default) && !IsInstrinsic(s));
         }
 
-        private ITypeSymbol GetSymbolType(ISymbol symbol)
+        private static ITypeSymbol GetSymbolType(ISymbol symbol)
         {
             if (symbol is IMethodSymbol method)
             {
@@ -63,9 +64,15 @@ namespace Microsoft.CodeAnalysis.Completion.Providers
             return symbol.GetSymbolType();
         }
 
-        protected override CompletionItem CreateItem(CompletionContext completionContext,
-            string displayText, string displayTextSuffix, string insertionText,
-            List<ISymbol> symbols, SyntaxContext context, bool preselect, SupportedPlatformData supportedPlatformData)
+        protected override CompletionItem CreateItem(
+            CompletionContext completionContext,
+            string displayText,
+            string displayTextSuffix,
+            string insertionText,
+            List<ISymbol> symbols,
+            SyntaxContext context,
+            bool preselect,
+            SupportedPlatformData supportedPlatformData)
         {
             var rules = GetCompletionItemRules(symbols, context, preselect);
             var matchPriority = preselect ? ComputeSymbolMatchPriority(symbols[0]) : MatchPriority.Default;
@@ -104,9 +111,7 @@ namespace Microsoft.CodeAnalysis.Completion.Providers
         }
 
         private static bool IsArgumentListTriggerCharacter(char character)
-        {
-            return character == ' ' || character == '(' || character == '[';
-        }
+            => character == ' ' || character == '(' || character == '[';
 
         protected abstract CompletionItemRules GetCompletionItemRules(List<ISymbol> symbols, SyntaxContext context, bool preselect);
 

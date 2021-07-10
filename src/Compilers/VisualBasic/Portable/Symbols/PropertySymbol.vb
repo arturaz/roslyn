@@ -146,7 +146,9 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
         ''' property has a setter or it is a getter only autoproperty accessed 
         ''' in a corresponding constructor or initializer
         ''' </summary>
-        Friend Function IsWritable(receiver As BoundExpression, containingBinder As Binder) As Boolean
+        Friend Function IsWritable(receiverOpt As BoundExpression, containingBinder As Binder) As Boolean
+            Debug.Assert(containingBinder IsNot Nothing)
+
             If Me.HasSet Then
                 Return True
             End If
@@ -155,11 +157,11 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
             Dim propertyIsStatic As Boolean = Me.IsShared
             Dim fromMember = containingBinder.ContainingMember
 
-            Return sourceProperty IsNot Nothing AndAlso
+            Return sourceProperty IsNot Nothing AndAlso fromMember IsNot Nothing AndAlso
                 sourceProperty.IsAutoProperty AndAlso
                 TypeSymbol.Equals(sourceProperty.ContainingType, fromMember.ContainingType, TypeCompareKind.ConsiderEverything) AndAlso
                 propertyIsStatic = fromMember.IsShared AndAlso
-                (propertyIsStatic OrElse receiver.Kind = BoundKind.MeReference) AndAlso
+                (propertyIsStatic OrElse (receiverOpt IsNot Nothing AndAlso receiverOpt.Kind = BoundKind.MeReference)) AndAlso
                 ((fromMember.Kind = SymbolKind.Method AndAlso DirectCast(fromMember, MethodSymbol).IsAnyConstructor) OrElse
                         TypeOf containingBinder Is DeclarationInitializerBinder)
 
@@ -177,7 +179,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
         ''' overridden property if such property exists.
         ''' 
         ''' NOTE: It is not possible in VB, but possible in other languages (for example in C#) to
-        '''       override read-write property an provide override only for setter, thus inheriting 
+        '''       override read-write property and provide override only for setter, thus inheriting 
         '''       getter's implementation. This method will find the Get method from the most-derived
         '''       overridden property in this case
         ''' </summary>
@@ -204,7 +206,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
         ''' overridden property if such property exists.
         ''' 
         ''' NOTE: It is not possible in VB, but possible in other languages (for example in C#) to
-        '''       override read-write property an provide override only for getter, thus inheriting 
+        '''       override read-write property and provide override only for getter, thus inheriting 
         '''       setter's implementation. This method will find the Set method from the most-derived
         '''       overridden property in this case
         ''' </summary>

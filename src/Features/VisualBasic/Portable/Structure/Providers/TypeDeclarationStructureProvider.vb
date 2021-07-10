@@ -3,8 +3,7 @@
 ' See the LICENSE file in the project root for more information.
 
 Imports System.Threading
-Imports Microsoft.CodeAnalysis.Options
-Imports Microsoft.CodeAnalysis.PooledObjects
+Imports Microsoft.CodeAnalysis.[Shared].Collections
 Imports Microsoft.CodeAnalysis.Structure
 Imports Microsoft.CodeAnalysis.VisualBasic.Syntax
 
@@ -13,10 +12,10 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Structure
         Inherits AbstractSyntaxNodeStructureProvider(Of TypeStatementSyntax)
 
         Protected Overrides Sub CollectBlockSpans(typeDeclaration As TypeStatementSyntax,
-                                                  spans As ArrayBuilder(Of BlockSpan),
-                                                  options As OptionSet,
+                                                  ByRef spans As TemporaryArray(Of BlockSpan),
+                                                  optionProvider As BlockStructureOptionProvider,
                                                   cancellationToken As CancellationToken)
-            CollectCommentsRegions(typeDeclaration, spans)
+            CollectCommentsRegions(typeDeclaration, spans, optionProvider)
 
             Dim block = TryCast(typeDeclaration.Parent, TypeBlockSyntax)
             If Not block?.EndBlockStatement.IsMissing Then
@@ -24,7 +23,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Structure
                     block, bannerNode:=typeDeclaration, autoCollapse:=False,
                     type:=BlockTypes.Type, isCollapsible:=True))
 
-                CollectCommentsRegions(block.EndBlockStatement, spans)
+                CollectCommentsRegions(block.EndBlockStatement, spans, optionProvider)
             End If
         End Sub
     End Class

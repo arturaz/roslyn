@@ -8,18 +8,20 @@ Imports System.Threading
 Imports Microsoft.CodeAnalysis
 Imports Microsoft.CodeAnalysis.Completion
 Imports Microsoft.CodeAnalysis.Completion.Providers
+Imports Microsoft.CodeAnalysis.Host.Mef
 Imports Microsoft.CodeAnalysis.Options
 Imports Microsoft.CodeAnalysis.Text
 Imports Microsoft.CodeAnalysis.VisualBasic.Syntax
 
 Namespace Microsoft.CodeAnalysis.VisualBasic.Completion.Providers
     <ExportCompletionProvider(NameOf(ObjectInitializerCompletionProvider), LanguageNames.VisualBasic)>
-    <ExtensionOrder(After:=NameOf(SymbolCompletionProvider))>
+    <ExtensionOrder(After:=NameOf(PreprocessorCompletionProvider))>
     <[Shared]>
     Friend Class ObjectInitializerCompletionProvider
         Inherits AbstractObjectInitializerCompletionProvider
 
         <ImportingConstructor>
+        <Obsolete(MefConstruction.ImportingConstructorMessage, True)>
         Public Sub New()
         End Sub
 
@@ -85,11 +87,6 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Completion.Providers
             Dim initializerLocation As Location = token.GetLocation()
             Dim symbolInfo = semanticModel.GetSymbolInfo(objectCreationExpression.Type, cancellationToken)
             Dim symbol = TryCast(symbolInfo.Symbol, ITypeSymbol)
-            If TypeOf symbol Is ITypeParameterSymbol Then
-                Dim typeParameterSymbol = TryCast(symbolInfo.Symbol, ITypeParameterSymbol)
-                Return Tuple.Create(Of ITypeSymbol, Location)(typeParameterSymbol.GetNamedTypeSymbolConstraint(), initializerLocation)
-            End If
-
             Return Tuple.Create(symbol, initializerLocation)
         End Function
 
@@ -116,7 +113,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Completion.Providers
             Return symbol.Name.EscapeIdentifier()
         End Function
 
-        Private Function IsValidProperty(member As ISymbol) As Boolean
+        Private Shared Function IsValidProperty(member As ISymbol) As Boolean
             Dim [property] = TryCast(member, IPropertySymbol)
             If [property] IsNot Nothing Then
                 Return [property].Parameters.IsDefaultOrEmpty OrElse [property].Parameters.All(Function(p) p.IsOptional OrElse p.IsParams)

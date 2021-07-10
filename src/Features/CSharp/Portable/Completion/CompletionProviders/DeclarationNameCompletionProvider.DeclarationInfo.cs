@@ -2,6 +2,8 @@
 // The .NET Foundation licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
+#nullable disable
+
 using System;
 using System.Collections.Immutable;
 using System.Threading;
@@ -21,6 +23,9 @@ namespace Microsoft.CodeAnalysis.CSharp.Completion.Providers
         {
             private static readonly ImmutableArray<SymbolKindOrTypeKind> s_parameterSyntaxKind =
                 ImmutableArray.Create(new SymbolKindOrTypeKind(SymbolKind.Parameter));
+
+            private static readonly ImmutableArray<SymbolKindOrTypeKind> s_propertySyntaxKind =
+                ImmutableArray.Create(new SymbolKindOrTypeKind(SymbolKind.Property));
 
             public NameDeclarationInfo(
                 ImmutableArray<SymbolKindOrTypeKind> possibleSymbolKinds,
@@ -46,24 +51,25 @@ namespace Microsoft.CodeAnalysis.CSharp.Completion.Providers
             {
                 var tree = await document.GetSyntaxTreeAsync(cancellationToken).ConfigureAwait(false);
                 var token = tree.FindTokenOnLeftOfPosition(position, cancellationToken).GetPreviousTokenIfTouchingWord(position);
-                var semanticModel = await document.GetSemanticModelForSpanAsync(new Text.TextSpan(token.SpanStart, 0), cancellationToken).ConfigureAwait(false);
+                var semanticModel = await document.ReuseExistingSpeculativeModelAsync(token.SpanStart, cancellationToken).ConfigureAwait(false);
                 var typeInferenceService = document.GetLanguageService<ITypeInferenceService>();
 
-                if (IsTupleTypeElement(token, semanticModel, position, cancellationToken, out var result)
-                    || IsParameterDeclaration(token, semanticModel, position, cancellationToken, out result)
-                    || IsTypeParameterDeclaration(token, semanticModel, position, out result)
-                    || IsLocalFunctionDeclaration(token, semanticModel, position, cancellationToken, out result)
-                    || IsLocalVariableDeclaration(token, semanticModel, position, cancellationToken, out result)
-                    || IsEmbeddedVariableDeclaration(token, semanticModel, position, cancellationToken, out result)
-                    || IsForEachVariableDeclaration(token, semanticModel, position, cancellationToken, out result)
-                    || IsIncompleteMemberDeclaration(token, semanticModel, position, cancellationToken, out result)
-                    || IsFieldDeclaration(token, semanticModel, position, cancellationToken, out result)
-                    || IsMethodDeclaration(token, semanticModel, position, cancellationToken, out result)
-                    || IsPropertyDeclaration(token, semanticModel, position, cancellationToken, out result)
-                    || IsPossibleOutVariableDeclaration(token, semanticModel, position, typeInferenceService, cancellationToken, out result)
-                    || IsTupleLiteralElement(token, semanticModel, position, cancellationToken, out result)
-                    || IsPossibleVariableOrLocalMethodDeclaration(token, semanticModel, position, cancellationToken, out result)
-                    || IsPatternMatching(token, semanticModel, position, cancellationToken, out result))
+                if (IsTupleTypeElement(token, semanticModel, cancellationToken, out var result)
+                    || IsPrimaryConstructorParameter(token, semanticModel, cancellationToken, out result)
+                    || IsParameterDeclaration(token, semanticModel, cancellationToken, out result)
+                    || IsTypeParameterDeclaration(token, out result)
+                    || IsLocalFunctionDeclaration(token, semanticModel, cancellationToken, out result)
+                    || IsLocalVariableDeclaration(token, semanticModel, cancellationToken, out result)
+                    || IsEmbeddedVariableDeclaration(token, semanticModel, cancellationToken, out result)
+                    || IsForEachVariableDeclaration(token, semanticModel, cancellationToken, out result)
+                    || IsIncompleteMemberDeclaration(token, semanticModel, cancellationToken, out result)
+                    || IsFieldDeclaration(token, semanticModel, cancellationToken, out result)
+                    || IsMethodDeclaration(token, semanticModel, cancellationToken, out result)
+                    || IsPropertyDeclaration(token, semanticModel, cancellationToken, out result)
+                    || IsPossibleOutVariableDeclaration(token, semanticModel, typeInferenceService, cancellationToken, out result)
+                    || IsTupleLiteralElement(token, semanticModel, cancellationToken, out result)
+                    || IsPossibleVariableOrLocalMethodDeclaration(token, semanticModel, cancellationToken, out result)
+                    || IsPatternMatching(token, semanticModel, cancellationToken, out result))
                 {
                     return result;
                 }
@@ -72,7 +78,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Completion.Providers
             }
 
             private static bool IsTupleTypeElement(
-                SyntaxToken token, SemanticModel semanticModel, int position,
+                SyntaxToken token, SemanticModel semanticModel,
                 CancellationToken cancellationToken, out NameDeclarationInfo result)
             {
                 result = IsFollowingTypeOrComma<TupleElementSyntax>(
@@ -86,7 +92,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Completion.Providers
             }
 
             private static bool IsTupleLiteralElement(
-                SyntaxToken token, SemanticModel semanticModel, int position,
+                SyntaxToken token, SemanticModel semanticModel,
                 CancellationToken cancellationToken, out NameDeclarationInfo result)
             {
                 // Incomplete code like
@@ -110,7 +116,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Completion.Providers
                 return false;
             }
 
-            private static bool IsPossibleOutVariableDeclaration(SyntaxToken token, SemanticModel semanticModel, int position,
+            private static bool IsPossibleOutVariableDeclaration(SyntaxToken token, SemanticModel semanticModel,
                 ITypeInferenceService typeInferenceService, CancellationToken cancellationToken, out NameDeclarationInfo result)
             {
                 if (!token.IsKind(SyntaxKind.IdentifierToken) || !token.Parent.IsKind(SyntaxKind.IdentifierName))
@@ -146,7 +152,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Completion.Providers
             }
 
             private static bool IsPossibleVariableOrLocalMethodDeclaration(
-                SyntaxToken token, SemanticModel semanticModel, int position,
+                SyntaxToken token, SemanticModel semanticModel,
                 CancellationToken cancellationToken, out NameDeclarationInfo result)
             {
                 result = IsLastTokenOfType<ExpressionStatementSyntax>(
@@ -161,7 +167,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Completion.Providers
             }
 
             private static bool IsPropertyDeclaration(SyntaxToken token, SemanticModel semanticModel,
-                int position, CancellationToken cancellationToken, out NameDeclarationInfo result)
+                CancellationToken cancellationToken, out NameDeclarationInfo result)
             {
                 result = IsLastTokenOfType<PropertyDeclarationSyntax>(
                     token,
@@ -175,7 +181,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Completion.Providers
             }
 
             private static bool IsMethodDeclaration(SyntaxToken token, SemanticModel semanticModel,
-                int position, CancellationToken cancellationToken, out NameDeclarationInfo result)
+                CancellationToken cancellationToken, out NameDeclarationInfo result)
             {
                 result = IsLastTokenOfType<MethodDeclarationSyntax>(
                     token,
@@ -276,7 +282,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Completion.Providers
             }
 
             private static bool IsFieldDeclaration(SyntaxToken token, SemanticModel semanticModel,
-                int position, CancellationToken cancellationToken, out NameDeclarationInfo result)
+                CancellationToken cancellationToken, out NameDeclarationInfo result)
             {
                 result = IsFollowingTypeOrComma<VariableDeclarationSyntax>(token, semanticModel,
                     v => v.Type,
@@ -287,7 +293,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Completion.Providers
             }
 
             private static bool IsIncompleteMemberDeclaration(SyntaxToken token, SemanticModel semanticModel,
-                int position, CancellationToken cancellationToken, out NameDeclarationInfo result)
+                CancellationToken cancellationToken, out NameDeclarationInfo result)
             {
                 result = IsLastTokenOfType<IncompleteMemberSyntax>(token, semanticModel,
                     i => i.Type,
@@ -298,7 +304,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Completion.Providers
             }
 
             private static bool IsLocalFunctionDeclaration(SyntaxToken token, SemanticModel semanticModel,
-                int position, CancellationToken cancellationToken, out NameDeclarationInfo result)
+                CancellationToken cancellationToken, out NameDeclarationInfo result)
             {
                 result = IsLastTokenOfType<LocalFunctionStatementSyntax>(token, semanticModel,
                     typeSyntaxGetter: f => f.ReturnType,
@@ -309,7 +315,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Completion.Providers
             }
 
             private static bool IsLocalVariableDeclaration(SyntaxToken token, SemanticModel semanticModel,
-                int position, CancellationToken cancellationToken, out NameDeclarationInfo result)
+                CancellationToken cancellationToken, out NameDeclarationInfo result)
             {
                 // If we only have a type, this can still end up being a local function (depending on the modifiers).
                 var possibleDeclarationComputer = token.IsKind(SyntaxKind.CommaToken)
@@ -324,11 +330,38 @@ namespace Microsoft.CodeAnalysis.CSharp.Completion.Providers
                         : (SyntaxTokenList?)null, // Return null to bail out.
                      possibleDeclarationComputer,
                      cancellationToken);
-                return result.Type != null;
+                if (result.Type != null)
+                {
+                    return true;
+                }
+
+                // If the type has a trailing question mark, we may parse it as a conditional access expression.
+                // We will use the condition as the type to bind; we won't make the type we bind nullable
+                // because we ignore nullability when generating names anyways
+                if (token.IsKind(SyntaxKind.QuestionToken) &&
+                    token.Parent is ConditionalExpressionSyntax conditionalExpressionSyntax)
+                {
+                    var symbolInfo = semanticModel.GetSymbolInfo(conditionalExpressionSyntax.Condition);
+
+                    if (symbolInfo.GetAnySymbol() is ITypeSymbol type)
+                    {
+                        var alias = semanticModel.GetAliasInfo(conditionalExpressionSyntax.Condition, cancellationToken);
+
+                        result = new NameDeclarationInfo(
+                            possibleDeclarationComputer(default),
+                            accessibility: null,
+                            declarationModifiers: default,
+                            type,
+                            alias);
+                        return true;
+                    }
+                }
+
+                return false;
             }
 
             private static bool IsEmbeddedVariableDeclaration(SyntaxToken token, SemanticModel semanticModel,
-                int position, CancellationToken cancellationToken, out NameDeclarationInfo result)
+                CancellationToken cancellationToken, out NameDeclarationInfo result)
             {
                 result = IsFollowingTypeOrComma<VariableDeclarationSyntax>(token, semanticModel,
                     typeSyntaxGetter: v => v.Type,
@@ -341,7 +374,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Completion.Providers
             }
 
             private static bool IsForEachVariableDeclaration(SyntaxToken token, SemanticModel semanticModel,
-                int position, CancellationToken cancellationToken, out NameDeclarationInfo result)
+                CancellationToken cancellationToken, out NameDeclarationInfo result)
             {
                 // This is parsed as ForEachVariableStatementSyntax:
                 // foreach (int $$
@@ -356,8 +389,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Completion.Providers
                 return result.Type != null;
             }
 
-            private static bool IsTypeParameterDeclaration(SyntaxToken token, SemanticModel semanticModel,
-                int position, out NameDeclarationInfo result)
+            private static bool IsTypeParameterDeclaration(SyntaxToken token, out NameDeclarationInfo result)
             {
                 if (token.IsKind(SyntaxKind.LessThanToken, SyntaxKind.CommaToken) &&
                     token.Parent.IsKind(SyntaxKind.TypeParameterList))
@@ -376,8 +408,28 @@ namespace Microsoft.CodeAnalysis.CSharp.Completion.Providers
                 return false;
             }
 
+            private static bool IsPrimaryConstructorParameter(SyntaxToken token, SemanticModel semanticModel,
+                CancellationToken cancellationToken, out NameDeclarationInfo result)
+            {
+                result = IsLastTokenOfType<ParameterSyntax>(
+                    token, semanticModel,
+                    p => p.Type,
+                    _ => default,
+                    _ => s_propertySyntaxKind,
+                    cancellationToken);
+
+                if (result.Type != null &&
+                    token.GetAncestor<ParameterSyntax>().Parent.IsParentKind(SyntaxKind.RecordDeclaration))
+                {
+                    return true;
+                }
+
+                result = default;
+                return false;
+            }
+
             private static bool IsParameterDeclaration(SyntaxToken token, SemanticModel semanticModel,
-                int position, CancellationToken cancellationToken, out NameDeclarationInfo result)
+                CancellationToken cancellationToken, out NameDeclarationInfo result)
             {
                 result = IsLastTokenOfType<ParameterSyntax>(
                     token, semanticModel,
@@ -389,7 +441,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Completion.Providers
             }
 
             private static bool IsPatternMatching(SyntaxToken token, SemanticModel semanticModel,
-                int position, CancellationToken cancellationToken, out NameDeclarationInfo result)
+                CancellationToken cancellationToken, out NameDeclarationInfo result)
             {
                 result = default;
                 if (token.Parent.IsParentKind(SyntaxKind.IsExpression))
@@ -427,7 +479,8 @@ namespace Microsoft.CodeAnalysis.CSharp.Completion.Providers
                 token.IsKind(
                     SyntaxKind.IdentifierToken,
                     SyntaxKind.GreaterThanToken,
-                    SyntaxKind.CloseBracketToken)
+                    SyntaxKind.CloseBracketToken,
+                    SyntaxKind.QuestionToken)
                 || token.Parent.IsKind(SyntaxKind.PredefinedType);
 
             private static ImmutableArray<SymbolKindOrTypeKind> GetPossibleMemberDeclarations(DeclarationModifiers modifiers)

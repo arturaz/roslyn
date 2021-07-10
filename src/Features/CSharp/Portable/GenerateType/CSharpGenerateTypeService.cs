@@ -2,29 +2,29 @@
 // The .NET Foundation licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
+#nullable disable
+
 using System;
 using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.Composition;
 using System.Diagnostics;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.CodeAnalysis.CodeGeneration;
-using Microsoft.CodeAnalysis.Editing;
 using Microsoft.CodeAnalysis.CSharp.Extensions;
 using Microsoft.CodeAnalysis.CSharp.Extensions.ContextQuery;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
-using Microsoft.CodeAnalysis.CSharp.Utilities;
+using Microsoft.CodeAnalysis.Editing;
 using Microsoft.CodeAnalysis.Formatting;
-using Microsoft.CodeAnalysis.GenerateMember.GenerateConstructor;
 using Microsoft.CodeAnalysis.GenerateType;
 using Microsoft.CodeAnalysis.Host.Mef;
 using Microsoft.CodeAnalysis.LanguageServices;
 using Microsoft.CodeAnalysis.Shared.Extensions;
 using Microsoft.CodeAnalysis.Text;
-using Roslyn.Utilities;
 using Microsoft.CodeAnalysis.Utilities;
-using System.Collections.Immutable;
+using Roslyn.Utilities;
 
 namespace Microsoft.CodeAnalysis.CSharp.GenerateType
 {
@@ -32,9 +32,8 @@ namespace Microsoft.CodeAnalysis.CSharp.GenerateType
     internal class CSharpGenerateTypeService :
         AbstractGenerateTypeService<CSharpGenerateTypeService, SimpleNameSyntax, ObjectCreationExpressionSyntax, ExpressionSyntax, TypeDeclarationSyntax, ArgumentSyntax>
     {
-        private static readonly SyntaxAnnotation s_annotation = new SyntaxAnnotation();
-
         [ImportingConstructor]
+        [Obsolete(MefConstruction.ImportingConstructorMessage, error: true)]
         public CSharpGenerateTypeService()
         {
         }
@@ -42,14 +41,10 @@ namespace Microsoft.CodeAnalysis.CSharp.GenerateType
         protected override string DefaultFileExtension => ".cs";
 
         protected override ExpressionSyntax GetLeftSideOfDot(SimpleNameSyntax simpleName)
-        {
-            return simpleName.GetLeftSideOfDot();
-        }
+            => simpleName.GetLeftSideOfDot();
 
         protected override bool IsInCatchDeclaration(ExpressionSyntax expression)
-        {
-            return expression.IsParentKind(SyntaxKind.CatchDeclaration);
-        }
+            => expression.IsParentKind(SyntaxKind.CatchDeclaration);
 
         protected override bool IsArrayElementType(ExpressionSyntax expression)
         {
@@ -125,7 +120,6 @@ namespace Microsoft.CodeAnalysis.CSharp.GenerateType
 
         protected override bool TryGetNameParts(ExpressionSyntax expression, out IList<string> nameParts)
         {
-            nameParts = new List<string>();
             return expression.TryGetNameParts(out nameParts);
         }
 
@@ -448,7 +442,7 @@ namespace Microsoft.CodeAnalysis.CSharp.GenerateType
             return true;
         }
 
-        private IMethodSymbol GetMethodSymbolIfPresent(SemanticModel semanticModel, ExpressionSyntax expression, CancellationToken cancellationToken)
+        private static IMethodSymbol GetMethodSymbolIfPresent(SemanticModel semanticModel, ExpressionSyntax expression, CancellationToken cancellationToken)
         {
             if (expression == null)
             {
@@ -476,7 +470,7 @@ namespace Microsoft.CodeAnalysis.CSharp.GenerateType
             return null;
         }
 
-        private Accessibility DetermineAccessibilityConstraint(
+        private static Accessibility DetermineAccessibilityConstraint(
             State state,
             SemanticModel semanticModel,
             CancellationToken cancellationToken)
@@ -485,7 +479,7 @@ namespace Microsoft.CodeAnalysis.CSharp.GenerateType
                 state.NameOrMemberAccessExpression as TypeSyntax, cancellationToken);
         }
 
-        private bool AllContainingTypesArePublicOrProtected(
+        private static bool AllContainingTypesArePublicOrProtected(
             State state,
             SemanticModel semanticModel,
             CancellationToken cancellationToken)
@@ -505,7 +499,7 @@ namespace Microsoft.CodeAnalysis.CSharp.GenerateType
                 var typeArguments = state.SimpleName.Arity == genericName.TypeArgumentList.Arguments.Count
                     ? genericName.TypeArgumentList.Arguments.OfType<SyntaxNode>().ToList()
                     : Enumerable.Repeat<SyntaxNode>(null, state.SimpleName.Arity);
-                return this.GetTypeParameters(state, semanticModel, typeArguments, cancellationToken);
+                return GetTypeParameters(state, semanticModel, typeArguments, cancellationToken);
             }
 
             return ImmutableArray<ITypeParameterSymbol>.Empty;
@@ -530,19 +524,13 @@ namespace Microsoft.CodeAnalysis.CSharp.GenerateType
         }
 
         public override string GetRootNamespace(CompilationOptions options)
-        {
-            return string.Empty;
-        }
+            => string.Empty;
 
         protected override bool IsInVariableTypeContext(ExpressionSyntax expression)
-        {
-            return false;
-        }
+            => false;
 
         protected override INamedTypeSymbol DetermineTypeToGenerateIn(SemanticModel semanticModel, SimpleNameSyntax simpleName, CancellationToken cancellationToken)
-        {
-            return semanticModel.GetEnclosingNamedType(simpleName.SpanStart, cancellationToken);
-        }
+            => semanticModel.GetEnclosingNamedType(simpleName.SpanStart, cancellationToken);
 
         protected override Accessibility GetAccessibility(State state, SemanticModel semanticModel, bool intoNamespace, CancellationToken cancellationToken)
         {
@@ -570,16 +558,12 @@ namespace Microsoft.CodeAnalysis.CSharp.GenerateType
         }
 
         protected override ITypeSymbol DetermineArgumentType(SemanticModel semanticModel, ArgumentSyntax argument, CancellationToken cancellationToken)
-        {
-            return argument.DetermineParameterType(semanticModel, cancellationToken);
-        }
+            => argument.DetermineParameterType(semanticModel, cancellationToken);
 
         protected override bool IsConversionImplicit(Compilation compilation, ITypeSymbol sourceType, ITypeSymbol targetType)
-        {
-            return compilation.ClassifyConversion(sourceType, targetType).IsImplicit;
-        }
+            => compilation.ClassifyConversion(sourceType, targetType).IsImplicit;
 
-        public override async Task<Tuple<INamespaceSymbol, INamespaceOrTypeSymbol, Location>> GetOrGenerateEnclosingNamespaceSymbolAsync(
+        public override async Task<(INamespaceSymbol, INamespaceOrTypeSymbol, Location)> GetOrGenerateEnclosingNamespaceSymbolAsync(
             INamedTypeSymbol namedTypeSymbol, string[] containers, Document selectedDocument, SyntaxNode selectedDocumentRoot, CancellationToken cancellationToken)
         {
             var compilationUnit = (CompilationUnitSyntax)selectedDocumentRoot;
@@ -588,15 +572,15 @@ namespace Microsoft.CodeAnalysis.CSharp.GenerateType
             {
                 // Search the NS declaration in the root
                 var containerList = new List<string>(containers);
-                var enclosingNamespace = GetDeclaringNamespace(containerList, 0, compilationUnit);
+                var enclosingNamespace = FindNamespaceInMemberDeclarations(compilationUnit.Members, indexDone: 0, containerList);
                 if (enclosingNamespace != null)
                 {
                     var enclosingNamespaceSymbol = semanticModel.GetSymbolInfo(enclosingNamespace.Name, cancellationToken);
                     if (enclosingNamespaceSymbol.Symbol != null)
                     {
-                        return Tuple.Create((INamespaceSymbol)enclosingNamespaceSymbol.Symbol,
-                                            (INamespaceOrTypeSymbol)namedTypeSymbol,
-                                            enclosingNamespace.CloseBraceToken.GetLocation());
+                        return ((INamespaceSymbol)enclosingNamespaceSymbol.Symbol,
+                                namedTypeSymbol,
+                                enclosingNamespace.CloseBraceToken.GetLocation());
                     }
                 }
             }
@@ -604,41 +588,32 @@ namespace Microsoft.CodeAnalysis.CSharp.GenerateType
             var globalNamespace = semanticModel.GetEnclosingNamespace(0, cancellationToken);
             var rootNamespaceOrType = namedTypeSymbol.GenerateRootNamespaceOrType(containers);
             var lastMember = compilationUnit.Members.LastOrDefault();
-            Location afterThisLocation = null;
-            if (lastMember != null)
-            {
-                afterThisLocation = semanticModel.SyntaxTree.GetLocation(new TextSpan(lastMember.Span.End, 0));
-            }
-            else
-            {
-                afterThisLocation = semanticModel.SyntaxTree.GetLocation(new TextSpan());
-            }
+            var afterThisLocation = lastMember != null
+                ? semanticModel.SyntaxTree.GetLocation(new TextSpan(lastMember.Span.End, 0))
+                : semanticModel.SyntaxTree.GetLocation(new TextSpan());
 
-            return Tuple.Create(globalNamespace,
-                                rootNamespaceOrType,
-                                afterThisLocation);
+            return (globalNamespace, rootNamespaceOrType, afterThisLocation);
         }
 
-        private NamespaceDeclarationSyntax GetDeclaringNamespace(List<string> containers, int indexDone, CompilationUnitSyntax compilationUnit)
+        private NamespaceDeclarationSyntax FindNamespaceInMemberDeclarations(SyntaxList<MemberDeclarationSyntax> members, int indexDone, List<string> containers)
         {
-            foreach (var member in compilationUnit.Members)
+            foreach (var member in members)
             {
-                var namespaceDeclaration = GetDeclaringNamespace(containers, 0, member);
-                if (namespaceDeclaration != null)
+                if (member is NamespaceDeclarationSyntax namespaceDeclaration)
                 {
-                    return namespaceDeclaration;
+                    var found = FindNamespaceInNamespace(namespaceDeclaration, indexDone, containers);
+                    if (found != null)
+                        return found;
                 }
             }
 
             return null;
         }
 
-        private NamespaceDeclarationSyntax GetDeclaringNamespace(List<string> containers, int indexDone, SyntaxNode localRoot)
+        private NamespaceDeclarationSyntax FindNamespaceInNamespace(NamespaceDeclarationSyntax namespaceDecl, int indexDone, List<string> containers)
         {
-            if (!(localRoot is NamespaceDeclarationSyntax namespaceDecl) || namespaceDecl.Name is AliasQualifiedNameSyntax)
-            {
+            if (namespaceDecl.Name is AliasQualifiedNameSyntax)
                 return null;
-            }
 
             var namespaceContainers = new List<string>();
             GetNamespaceContainers(namespaceDecl.Name, namespaceContainers);
@@ -651,23 +626,12 @@ namespace Microsoft.CodeAnalysis.CSharp.GenerateType
 
             indexDone += namespaceContainers.Count;
             if (indexDone == containers.Count)
-            {
                 return namespaceDecl;
-            }
 
-            foreach (var member in namespaceDecl.Members)
-            {
-                var resultant = GetDeclaringNamespace(containers, indexDone, member);
-                if (resultant != null)
-                {
-                    return resultant;
-                }
-            }
-
-            return null;
+            return FindNamespaceInMemberDeclarations(namespaceDecl.Members, indexDone, containers);
         }
 
-        private bool IdentifierMatches(int indexDone, List<string> namespaceContainers, List<string> containers)
+        private static bool IdentifierMatches(int indexDone, List<string> namespaceContainers, List<string> containers)
         {
             for (var i = 0; i < namespaceContainers.Count; ++i)
             {
@@ -789,7 +753,7 @@ namespace Microsoft.CodeAnalysis.CSharp.GenerateType
             return false;
         }
 
-        private bool IsAllContainingTypeDeclsPublic(SyntaxNode node)
+        private static bool IsAllContainingTypeDeclsPublic(SyntaxNode node)
         {
             // Make sure that all the containing Type Declarations are also Public
             var containingTypeDeclarations = node.GetAncestors<TypeDeclarationSyntax>();
@@ -854,7 +818,7 @@ namespace Microsoft.CodeAnalysis.CSharp.GenerateType
             return updatedSolution;
         }
 
-        private ITypeSymbol GetPropertyType(
+        private static ITypeSymbol GetPropertyType(
             SimpleNameSyntax propertyName,
             SemanticModel semanticModel,
             ITypeInferenceService typeInference,
@@ -875,7 +839,7 @@ namespace Microsoft.CodeAnalysis.CSharp.GenerateType
             return null;
         }
 
-        private IPropertySymbol CreatePropertySymbol(
+        private static IPropertySymbol CreatePropertySymbol(
             SimpleNameSyntax propertyName, ITypeSymbol propertyType)
         {
             return CodeGenerationSymbolFactory.CreatePropertySymbol(
@@ -904,7 +868,6 @@ namespace Microsoft.CodeAnalysis.CSharp.GenerateType
             CancellationToken cancellationToken,
             out IPropertySymbol property)
         {
-            property = null;
             var propertyType = GetPropertyType(propertyName, semanticModel, typeInference, cancellationToken);
             if (propertyType == null || propertyType is IErrorTypeSymbol)
             {
@@ -914,40 +877,6 @@ namespace Microsoft.CodeAnalysis.CSharp.GenerateType
 
             property = CreatePropertySymbol(propertyName, propertyType);
             return property != null;
-        }
-
-        internal override IMethodSymbol GetDelegatingConstructor(
-            SemanticDocument document,
-            ObjectCreationExpressionSyntax objectCreation,
-            INamedTypeSymbol namedType,
-            ISet<IMethodSymbol> candidates,
-            CancellationToken cancellationToken)
-        {
-            var model = document.SemanticModel;
-
-            var oldNode = objectCreation
-                    .AncestorsAndSelf(ascendOutOfTrivia: false)
-                    .Where(node => SpeculationAnalyzer.CanSpeculateOnNode(node))
-                    .LastOrDefault();
-
-            var typeNameToReplace = objectCreation.Type;
-            var newTypeName = namedType.GenerateTypeSyntax();
-            var newObjectCreation = objectCreation.WithType(newTypeName).WithAdditionalAnnotations(s_annotation);
-            var newNode = oldNode.ReplaceNode(objectCreation, newObjectCreation);
-
-            var speculativeModel = SpeculationAnalyzer.CreateSpeculativeSemanticModelForNode(oldNode, newNode, model);
-            if (speculativeModel != null)
-            {
-                newObjectCreation = (ObjectCreationExpressionSyntax)newNode.GetAnnotatedNodes(s_annotation).Single();
-                var symbolInfo = speculativeModel.GetSymbolInfo(newObjectCreation, cancellationToken);
-                var parameterTypes = newObjectCreation.ArgumentList.Arguments.Select(
-                    a => a.DetermineParameterType(speculativeModel, cancellationToken)).ToList();
-
-                return GenerateConstructorHelpers.GetDelegatingConstructor(
-                    document, symbolInfo, candidates, namedType, parameterTypes);
-            }
-
-            return null;
         }
     }
 }

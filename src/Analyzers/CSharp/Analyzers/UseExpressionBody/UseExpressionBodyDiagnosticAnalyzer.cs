@@ -2,16 +2,16 @@
 // The .NET Foundation licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
+#nullable disable
+
 using System.Collections.Immutable;
 using System.Linq;
 using Microsoft.CodeAnalysis.CodeStyle;
 using Microsoft.CodeAnalysis.Diagnostics;
+using Microsoft.CodeAnalysis.Options;
 
 #if CODE_STYLE
 using OptionSet = Microsoft.CodeAnalysis.Diagnostics.AnalyzerConfigOptions;
-using Microsoft.CodeAnalysis.Internal.Options;
-#else
-using Microsoft.CodeAnalysis.Options;
 #endif
 
 namespace Microsoft.CodeAnalysis.CSharp.UseExpressionBody
@@ -36,7 +36,7 @@ namespace Microsoft.CodeAnalysis.CSharp.UseExpressionBody
             var builder = ImmutableDictionary.CreateBuilder<DiagnosticDescriptor, ILanguageSpecificOption>();
             foreach (var helper in _helpers)
             {
-                var descriptor = CreateDescriptorWithId(helper.DiagnosticId, helper.UseExpressionBodyTitle, helper.UseExpressionBodyTitle);
+                var descriptor = CreateDescriptorWithId(helper.DiagnosticId, helper.EnforceOnBuild, helper.UseExpressionBodyTitle, helper.UseExpressionBodyTitle);
                 builder.Add(descriptor, helper.Option);
             }
 
@@ -90,7 +90,7 @@ namespace Microsoft.CodeAnalysis.CSharp.UseExpressionBody
             }
         }
 
-        private Diagnostic AnalyzeSyntax(
+        private static Diagnostic AnalyzeSyntax(
             OptionSet optionSet, SyntaxNode declaration, UseExpressionBodyHelper helper)
         {
             var preferExpressionBodiedOption = optionSet.GetOption(helper.Option);
@@ -105,7 +105,7 @@ namespace Microsoft.CodeAnalysis.CSharp.UseExpressionBody
                 var additionalLocations = ImmutableArray.Create(declaration.GetLocation());
                 var properties = ImmutableDictionary<string, string>.Empty.Add(nameof(UseExpressionBody), "");
                 return DiagnosticHelper.Create(
-                    CreateDescriptorWithId(helper.DiagnosticId, helper.UseExpressionBodyTitle, helper.UseExpressionBodyTitle),
+                    CreateDescriptorWithId(helper.DiagnosticId, helper.EnforceOnBuild, helper.UseExpressionBodyTitle, helper.UseExpressionBodyTitle),
                     location, severity, additionalLocations: additionalLocations, properties: properties);
             }
 
@@ -126,7 +126,7 @@ namespace Microsoft.CodeAnalysis.CSharp.UseExpressionBody
 
                 var additionalLocations = ImmutableArray.Create(declaration.GetLocation());
                 return DiagnosticHelper.Create(
-                    CreateDescriptorWithId(helper.DiagnosticId, helper.UseBlockBodyTitle, helper.UseBlockBodyTitle),
+                    CreateDescriptorWithId(helper.DiagnosticId, helper.EnforceOnBuild, helper.UseBlockBodyTitle, helper.UseBlockBodyTitle),
                     location, severity, additionalLocations: additionalLocations, properties: properties);
             }
 

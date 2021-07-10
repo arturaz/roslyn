@@ -10,8 +10,14 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.CodeAnalysis.Completion;
 using Microsoft.CodeAnalysis.Diagnostics.Analyzers.NamingStyles;
+using Microsoft.CodeAnalysis.Editing;
+using Microsoft.CodeAnalysis.Formatting;
+using Microsoft.CodeAnalysis.Formatting.Rules;
+using Microsoft.CodeAnalysis.Shared.Naming;
 using Microsoft.CodeAnalysis.Simplification;
+using Microsoft.CodeAnalysis.Text;
 using Roslyn.Utilities;
+using static Microsoft.CodeAnalysis.Diagnostics.Analyzers.NamingStyles.SymbolSpecification;
 
 namespace Microsoft.CodeAnalysis.Shared.Extensions
 {
@@ -19,13 +25,13 @@ namespace Microsoft.CodeAnalysis.Shared.Extensions
     {
         public static bool ShouldHideAdvancedMembers(this Document document)
         {
-            // Since we don't actually have a way to configure this per-document, we can fetch from the core workspace
-            return document.Project.Solution.Workspace.Options.GetOption(CompletionOptions.HideAdvancedMembers, document.Project.Language);
+            // Since we don't actually have a way to configure this per-document, we can fetch from the solution
+            return document.Project.Solution.Options.GetOption(CompletionOptions.HideAdvancedMembers, document.Project.Language);
         }
 
         public static async Task<Document> ReplaceNodeAsync<TNode>(this Document document, TNode oldNode, TNode newNode, CancellationToken cancellationToken) where TNode : SyntaxNode
         {
-            var root = await document.GetSyntaxRootAsync(cancellationToken).ConfigureAwait(false);
+            var root = await document.GetRequiredSyntaxRootAsync(cancellationToken).ConfigureAwait(false);
             var newRoot = root.ReplaceNode(oldNode, newNode);
             return document.WithSyntaxRoot(newRoot);
         }
@@ -35,7 +41,7 @@ namespace Microsoft.CodeAnalysis.Shared.Extensions
             Func<SyntaxNode, SyntaxNode, SyntaxNode> computeReplacementNode,
             CancellationToken cancellationToken)
         {
-            var root = await document.GetSyntaxRootAsync(cancellationToken).ConfigureAwait(false);
+            var root = await document.GetRequiredSyntaxRootAsync(cancellationToken).ConfigureAwait(false);
             var newRoot = root.ReplaceNodes(nodes, computeReplacementNode);
             return document.WithSyntaxRoot(newRoot);
         }
@@ -56,7 +62,7 @@ namespace Microsoft.CodeAnalysis.Shared.Extensions
             var totalItems = itemsForCurrentContext.ToSet(comparer);
             foreach (var linkedDocumentId in linkedDocumentIds)
             {
-                var linkedDocument = document.Project.Solution.GetDocument(linkedDocumentId);
+                var linkedDocument = document.Project.Solution.GetRequiredDocument(linkedDocumentId);
                 var items = await getItemsWorker(linkedDocument, cancellationToken).ConfigureAwait(false);
                 if (items != null)
                 {
@@ -80,7 +86,7 @@ namespace Microsoft.CodeAnalysis.Shared.Extensions
             var solution = document.Project.Solution;
             foreach (var linkedDocumentId in document.GetLinkedDocumentIds())
             {
-                var linkedDocument = solution.GetDocument(linkedDocumentId);
+                var linkedDocument = solution.GetRequiredDocument(linkedDocumentId);
                 if (await contextChecker(linkedDocument, cancellationToken).ConfigureAwait(false))
                 {
                     return true;
@@ -91,23 +97,79 @@ namespace Microsoft.CodeAnalysis.Shared.Extensions
         }
 
         /// <summary>
-        /// Get the user-specified naming rules, then add standard default naming rules (if provided). The standard 
-        /// naming rules (fallback rules) are added at the end so they will only be used if the user hasn't specified 
-        /// a preference.
+        /// Gets the set of naming rules the user has set for this document.  Will include a set of default naming rules
+        /// that match if the user hasn't specified any for a particular symbol type.  The are added at the end so they
+        /// will only be used if the user hasn't specified a preference.
         /// </summary>
-        internal static async Task<ImmutableArray<NamingRule>> GetNamingRulesAsync(this Document document,
+        public static Task<ImmutableArray<NamingRule>> GetNamingRulesAsync(
+            this Document document, CancellationToken cancellationToken)
+            => document.GetNamingRulesAsync(FallbackNamingRules.Default, cancellationToken);
+
+        /// <summary>
+        /// Get the user-specified naming rules, with the added <paramref name="defaultRules"/>.
+        /// </summary>
+        public static async Task<ImmutableArray<NamingRule>> GetNamingRulesAsync(this Document document,
             ImmutableArray<NamingRule> defaultRules, CancellationToken cancellationToken)
         {
             var options = await document.GetOptionsAsync(cancellationToken).ConfigureAwait(false);
             var namingStyleOptions = options.GetOption(NamingStyleOptions.NamingPreferences);
             var rules = namingStyleOptions.CreateRules().NamingRules;
 
-            if (defaultRules.Length > 0)
+            return defaultRules.IsDefaultOrEmpty ? rules : rules.AddRange(defaultRules);
+        }
+
+        public static async Task<NamingRule> GetApplicableNamingRuleAsync(this Document document, ISymbol symbol, CancellationToken cancellationToken)
+        {
+            var rules = await document.GetNamingRulesAsync(cancellationToken).ConfigureAwait(false);
+            foreach (var rule in rules)
             {
-                rules = rules.AddRange(defaultRules);
+                if (rule.SymbolSpecification.AppliesTo(symbol))
+                    return rule;
             }
 
-            return rules;
+            throw ExceptionUtilities.Unreachable;
+        }
+
+        public static async Task<NamingRule> GetApplicableNamingRuleAsync(
+            this Document document, SymbolKind symbolKind, Accessibility accessibility, CancellationToken cancellationToken)
+        {
+            var rules = await document.GetNamingRulesAsync(cancellationToken).ConfigureAwait(false);
+            foreach (var rule in rules)
+            {
+                if (rule.SymbolSpecification.AppliesTo(symbolKind, accessibility))
+                    return rule;
+            }
+
+            throw ExceptionUtilities.Unreachable;
+        }
+
+        public static async Task<NamingRule> GetApplicableNamingRuleAsync(
+            this Document document, SymbolKindOrTypeKind kind, DeclarationModifiers modifiers, Accessibility? accessibility, CancellationToken cancellationToken)
+        {
+            var rules = await document.GetNamingRulesAsync(cancellationToken).ConfigureAwait(false);
+            foreach (var rule in rules)
+            {
+                if (rule.SymbolSpecification.AppliesTo(kind, modifiers, accessibility))
+                    return rule;
+            }
+
+            throw ExceptionUtilities.Unreachable;
+        }
+
+        public static ImmutableArray<AbstractFormattingRule> GetFormattingRules(this Document document, TextSpan span, IEnumerable<AbstractFormattingRule>? additionalRules)
+        {
+            var workspace = document.Project.Solution.Workspace;
+            var formattingRuleFactory = workspace.Services.GetRequiredService<IHostDependentFormattingRuleFactoryService>();
+            // Not sure why this is being done... there aren't any docs on CreateRule either.
+            var position = (span.Start + span.End) / 2;
+
+            var rules = ImmutableArray.Create(formattingRuleFactory.CreateRule(document, position));
+            if (additionalRules != null)
+            {
+                rules = rules.AddRange(additionalRules);
+            }
+
+            return rules.AddRange(Formatter.GetDefaultFormattingRules(document));
         }
     }
 }
